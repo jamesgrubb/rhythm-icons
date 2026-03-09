@@ -33,9 +33,10 @@ Office.onReady(async ({ host }) => {
   const emptyState     = document.getElementById("empty-state");
   const emptyQuery     = document.getElementById("empty-query");
   const resultCount    = document.getElementById("result-count");
-  const toast          = document.getElementById("toast");
-  const sizeBtns       = document.querySelectorAll(".size-btn");
-  const colorBtns      = document.querySelectorAll(".color-btn");
+  const toast                = document.getElementById("toast");
+  const sizeBtns             = document.querySelectorAll(".size-btn");
+  const colorBtns            = document.querySelectorAll(".color-btn");
+  const circleBackgroundToggle = document.getElementById("circle-background-toggle");
 
   // ---- State ----
   let allIcons       = [];
@@ -43,6 +44,7 @@ Office.onReady(async ({ host }) => {
   let activeQuery    = "";
   let selectedSize   = 48;   // px — inserted icon size
   let selectedColor  = "Accent1";  // PowerPoint theme color
+  let circleBackground = false;  // Add circle background to icons
   let toastTimer     = null;
 
   // ---- Helpers ----
@@ -198,11 +200,23 @@ Office.onReady(async ({ host }) => {
       modifiedContent = modifiedContent.replace(/<polygon /g, `<polygon class="${strokeClass}" `);
       modifiedContent = modifiedContent.replace(/<ellipse /g, `<ellipse class="${strokeClass}" `);
 
+      // Add circle background if enabled (opaque tint: light gray base + colored overlay)
+      const backgroundCircle = circleBackground
+        ? `<circle cx="12" cy="12" r="17" class="MsftOfcThm_Background2_Fill_v2" />
+           <circle cx="12" cy="12" r="17" class="${themeClass}_Fill_v2" opacity="0.35" />`
+        : '';
+
+      // Adjust viewBox to accommodate larger circle with more padding (6 units on each side)
+      const viewBox = circleBackground ? "-6 -6 36 36" : "0 0 24 24";
+
       // Build SVG with internal CSS style block - PowerPoint will override with theme color
-      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="0 0 24 24">
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="${viewBox}">
         <style>
           .${strokeClass} { stroke: ${fallbackColor}; fill: none; }
+          .${themeClass}_Fill_v2 { fill: ${fallbackColor}; }
+          .MsftOfcThm_Background2_Fill_v2 { fill: #F5F5F5; }
         </style>
+        ${backgroundCircle}
         ${modifiedContent}
       </svg>`;
     } else {
@@ -215,10 +229,21 @@ Office.onReady(async ({ host }) => {
       modifiedContent = modifiedContent.replace(/<polygon /g, `<polygon class="${fillClass}" `);
       modifiedContent = modifiedContent.replace(/<ellipse /g, `<ellipse class="${fillClass}" `);
 
-      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="0 0 24 24">
+      // Add circle background if enabled (opaque tint: light gray base + colored overlay)
+      const backgroundCircle = circleBackground
+        ? `<circle cx="12" cy="12" r="17" class="MsftOfcThm_Background2_Fill_v2" />
+           <circle cx="12" cy="12" r="17" class="${fillClass}" opacity="0.35" />`
+        : '';
+
+      // Adjust viewBox to accommodate larger circle with more padding (6 units on each side)
+      const viewBox = circleBackground ? "-6 -6 36 36" : "0 0 24 24";
+
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="${viewBox}">
         <style>
           .${fillClass} { fill: ${fallbackColor}; }
+          .MsftOfcThm_Background2_Fill_v2 { fill: #F5F5F5; }
         </style>
+        ${backgroundCircle}
         ${modifiedContent}
       </svg>`;
     }
@@ -331,6 +356,12 @@ Office.onReady(async ({ host }) => {
       selectedColor = btn.dataset.color;
       console.log("[Color] Selected theme color:", selectedColor);
     });
+  });
+
+  // ---- Circle background toggle ----
+  circleBackgroundToggle.addEventListener("change", () => {
+    circleBackground = circleBackgroundToggle.checked;
+    console.log("[Background] Circle background:", circleBackground);
   });
 
   // ---- Sign-in ----
