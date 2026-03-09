@@ -291,6 +291,53 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   color: var(--text-3);
 }
 
+/* ---- COLOR BAR ---- */
+#color-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+.color-label { font-size: 11px; color: var(--text-3); }
+.color-options { display: flex; gap: 3px; flex-wrap: wrap; }
+.color-btn {
+  min-width: 28px;
+  height: 22px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: all 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.color-btn:hover {
+  border-color: var(--border-2);
+  background: var(--bg-3);
+  transform: translateY(-1px);
+}
+.color-btn.active {
+  background: var(--bg-3);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.color-name {
+  font-size: 9px;
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: -0.3px;
+}
+.color-btn:hover .color-name {
+  color: var(--text);
+}
+.color-btn.active .color-name {
+  color: var(--accent);
+}
+
 /* ---- ICON GRID ---- */
 #icon-grid {
   display: grid;

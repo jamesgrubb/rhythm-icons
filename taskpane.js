@@ -35,12 +35,14 @@ Office.onReady(async ({ host }) => {
   const resultCount    = document.getElementById("result-count");
   const toast          = document.getElementById("toast");
   const sizeBtns       = document.querySelectorAll(".size-btn");
+  const colorBtns      = document.querySelectorAll(".color-btn");
 
   // ---- State ----
-  let allIcons     = [];
+  let allIcons       = [];
   let activeCategory = "All";
   let activeQuery    = "";
   let selectedSize   = 48;   // px — inserted icon size
+  let selectedColor  = "Accent1";  // PowerPoint theme color
   let toastTimer     = null;
 
   // ---- Helpers ----
@@ -149,6 +151,24 @@ Office.onReady(async ({ host }) => {
   // ---- PowerPoint insertion: Insert SVG with theme color support ----
   async function insertIntoPowerPoint(icon) {
     console.log("[PPT] Preparing SVG with theme colors...");
+    console.log("[PPT] Using theme color:", selectedColor);
+
+    // Fallback colors for each theme color (Office default theme)
+    const themeColorMap = {
+      Background1: "#FFFFFF",
+      Background2: "#F5F5F5",
+      Text1: "#000000",
+      Text2: "#444444",
+      Accent1: "#4472C4",
+      Accent2: "#ED7D31",
+      Accent3: "#A5A5A5",
+      Accent4: "#FFC000",
+      Accent5: "#5B9BD5",
+      Accent6: "#70AD47"
+    };
+
+    const fallbackColor = themeColorMap[selectedColor] || "#4472C4";
+    const themeClass = `MsftOfcThm_${selectedColor}`;
 
     // Prepare SVG with proper structure and theme color classes
     let svg = icon.svg;
@@ -169,31 +189,38 @@ Office.onReady(async ({ host }) => {
       modifiedContent = modifiedContent.replace(/fill="none"/g, '');
 
       // Add theme class to all shape elements
-      modifiedContent = modifiedContent.replace(/<path /g, '<path class="MsftOfcThm_Accent1_Stroke_v2" ');
-      modifiedContent = modifiedContent.replace(/<line /g, '<line class="MsftOfcThm_Accent1_Stroke_v2" ');
-      modifiedContent = modifiedContent.replace(/<polyline /g, '<polyline class="MsftOfcThm_Accent1_Stroke_v2" ');
-      modifiedContent = modifiedContent.replace(/<circle /g, '<circle class="MsftOfcThm_Accent1_Stroke_v2" ');
-      modifiedContent = modifiedContent.replace(/<rect /g, '<rect class="MsftOfcThm_Accent1_Stroke_v2" ');
-      modifiedContent = modifiedContent.replace(/<polygon /g, '<polygon class="MsftOfcThm_Accent1_Stroke_v2" ');
-      modifiedContent = modifiedContent.replace(/<ellipse /g, '<ellipse class="MsftOfcThm_Accent1_Stroke_v2" ');
+      const strokeClass = `${themeClass}_Stroke_v2`;
+      modifiedContent = modifiedContent.replace(/<path /g, `<path class="${strokeClass}" `);
+      modifiedContent = modifiedContent.replace(/<line /g, `<line class="${strokeClass}" `);
+      modifiedContent = modifiedContent.replace(/<polyline /g, `<polyline class="${strokeClass}" `);
+      modifiedContent = modifiedContent.replace(/<circle /g, `<circle class="${strokeClass}" `);
+      modifiedContent = modifiedContent.replace(/<rect /g, `<rect class="${strokeClass}" `);
+      modifiedContent = modifiedContent.replace(/<polygon /g, `<polygon class="${strokeClass}" `);
+      modifiedContent = modifiedContent.replace(/<ellipse /g, `<ellipse class="${strokeClass}" `);
 
       // Build SVG with internal CSS style block - PowerPoint will override with theme color
       svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="0 0 24 24">
         <style>
-          .MsftOfcThm_Accent1_Stroke_v2 { stroke: #4472C4; fill: none; }
+          .${strokeClass} { stroke: ${fallbackColor}; fill: none; }
         </style>
         ${modifiedContent}
       </svg>`;
     } else {
       // For fill icons
+      const fillClass = `${themeClass}_Fill_v2`;
       let modifiedContent = svgContent;
-      modifiedContent = modifiedContent.replace(/<path/g, '<path class="MsftOfcThm_Accent1_Fill_v2"');
-      modifiedContent = modifiedContent.replace(/<circle/g, '<circle class="MsftOfcThm_Accent1_Fill_v2"');
-      modifiedContent = modifiedContent.replace(/<rect/g, '<rect class="MsftOfcThm_Accent1_Fill_v2"');
-      modifiedContent = modifiedContent.replace(/<polygon/g, '<polygon class="MsftOfcThm_Accent1_Fill_v2"');
-      modifiedContent = modifiedContent.replace(/<ellipse/g, '<ellipse class="MsftOfcThm_Accent1_Fill_v2"');
+      modifiedContent = modifiedContent.replace(/<path /g, `<path class="${fillClass}" `);
+      modifiedContent = modifiedContent.replace(/<circle /g, `<circle class="${fillClass}" `);
+      modifiedContent = modifiedContent.replace(/<rect /g, `<rect class="${fillClass}" `);
+      modifiedContent = modifiedContent.replace(/<polygon /g, `<polygon class="${fillClass}" `);
+      modifiedContent = modifiedContent.replace(/<ellipse /g, `<ellipse class="${fillClass}" `);
 
-      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="0 0 24 24">${modifiedContent}</svg>`;
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="0 0 24 24">
+        <style>
+          .${fillClass} { fill: ${fallbackColor}; }
+        </style>
+        ${modifiedContent}
+      </svg>`;
     }
 
     console.log("[PPT] Full SVG:", svg);
@@ -293,6 +320,16 @@ Office.onReady(async ({ host }) => {
       sizeBtns.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       selectedSize = parseInt(btn.dataset.size, 10);
+    });
+  });
+
+  // ---- Color selector ----
+  colorBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      colorBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedColor = btn.dataset.color;
+      console.log("[Color] Selected theme color:", selectedColor);
     });
   });
 
