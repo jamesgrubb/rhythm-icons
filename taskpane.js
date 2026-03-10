@@ -202,7 +202,7 @@ Office.onReady(async ({ host }) => {
 
       // Extract stroke-width and other properties from existing styles
       const styleMatch = modifiedContent.match(/<style[\s\S]*?<\/style>/);
-      let strokeWidth = '1'; // default - matches PowerPoint 1pt
+      let strokeWidth = '2'; // default - 2pt stroke
       let strokeLinecap = 'round';
       let strokeLinejoin = 'round';
 
@@ -220,11 +220,11 @@ Office.onReady(async ({ host }) => {
 
       console.log(`[PPT] Extracted properties: stroke-width=${strokeWidth}, linecap=${strokeLinecap}, linejoin=${strokeLinejoin}`);
 
-      // Scale stroke-width to maintain constant 1pt appearance across all icon sizes
+      // Scale stroke-width to maintain constant 2pt appearance across all icon sizes
       // Formula: Keep stroke constant in pixels regardless of icon size
-      // For 48px icon with viewBox 24x24: 1 viewBox unit = 2px, so we want stroke = 0.5 to get 1pt
+      // For 48px icon with viewBox 24x24: 1 viewBox unit = 2px, so we want stroke = 1.0 to get 2pt
       const scaleFactor = selectedSize / 24; // How many pixels per viewBox unit
-      const targetStrokePt = 1; // Target stroke in points
+      const targetStrokePt = 2; // Target stroke in points
       const adjustedStrokeWidth = targetStrokePt / scaleFactor;
 
       console.log(`[PPT] Icon size: ${selectedSize}px, Scale: ${scaleFactor}x, Adjusted stroke: ${adjustedStrokeWidth.toFixed(3)} (renders as ${targetStrokePt}pt)`);
@@ -292,7 +292,7 @@ Office.onReady(async ({ host }) => {
 
       // Extract stroke properties from existing styles
       const styleMatch = modifiedContent.match(/<style[\s\S]*?<\/style>/);
-      let strokeWidth = '1'; // default - matches PowerPoint 1pt
+      let strokeWidth = '2'; // default - 2pt stroke
       let strokeLinecap = 'round';
       let strokeLinejoin = 'round';
 
@@ -310,9 +310,9 @@ Office.onReady(async ({ host }) => {
 
       console.log(`[PPT Fill] Extracted properties: stroke-width=${strokeWidth}, linecap=${strokeLinecap}, linejoin=${strokeLinejoin}`);
 
-      // Scale stroke-width to maintain constant 1pt appearance across all icon sizes
+      // Scale stroke-width to maintain constant 2pt appearance across all icon sizes
       const scaleFactor = selectedSize / 24;
-      const targetStrokePt = 1;
+      const targetStrokePt = 2;
       const adjustedStrokeWidth = targetStrokePt / scaleFactor;
 
       console.log(`[PPT Fill] Icon size: ${selectedSize}px, Scale: ${scaleFactor}x, Adjusted stroke: ${adjustedStrokeWidth.toFixed(3)} (renders as ${targetStrokePt}pt)`);
@@ -661,19 +661,19 @@ Office.onReady(async ({ host }) => {
 
         // Auto-fix missing stroke-width
         if (hasStroke && !strokeWidthMatch) {
-          console.warn(`[Upload] ⚠️  "${iconName}": Missing stroke-width, adding default 1px`);
+          console.warn(`[Upload] ⚠️  "${iconName}": Missing stroke-width, adding default 2px`);
 
           // Add stroke-width to style blocks
           svgContent = svgContent.replace(/(<style[\s\S]*?)(stroke-linecap|stroke-linejoin|stroke:)/g,
-            (match, before, prop) => `${before}stroke-width: 1;\n            ${prop}`);
+            (match, before, prop) => `${before}stroke-width: 2;\n            ${prop}`);
 
-          console.log(`[Upload] ✓ "${iconName}": Auto-added stroke-width: 1px`);
+          console.log(`[Upload] ✓ "${iconName}": Auto-added stroke-width: 2px`);
         } else if (strokeWidthMatch) {
           const strokeWidth = parseFloat(strokeWidthMatch[1]);
-          const isStandardStroke = strokeWidth >= 0.75 && strokeWidth <= 1.5;
+          const isStandardStroke = strokeWidth >= 1.5 && strokeWidth <= 2.5;
 
           if (!isStandardStroke) {
-            console.warn(`[Upload] ⚠️  "${iconName}": Non-standard stroke-width ${strokeWidth}px (expected 1px to match PowerPoint 1pt)`);
+            console.warn(`[Upload] ⚠️  "${iconName}": Non-standard stroke-width ${strokeWidth}px (expected 2px to match PowerPoint 2pt)`);
           } else {
             console.log(`[Upload] ✓ "${iconName}": Standard stroke-width ${strokeWidth}px`);
           }
