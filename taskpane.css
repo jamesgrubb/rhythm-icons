@@ -365,7 +365,8 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 .background-toggle:hover .background-label {
   color: var(--text);
 }
-#circle-background-toggle {
+#circle-background-toggle,
+#fill-toggle {
   width: 14px;
   height: 14px;
   cursor: pointer;

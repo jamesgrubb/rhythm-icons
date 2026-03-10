@@ -37,6 +37,7 @@ Office.onReady(async ({ host }) => {
   const sizeBtns             = document.querySelectorAll(".size-btn");
   const colorBtns            = document.querySelectorAll(".color-btn");
   const circleBackgroundToggle = document.getElementById("circle-background-toggle");
+  const fillToggle           = document.getElementById("fill-toggle");
   const uploadBtn            = document.getElementById("upload-btn");
   const uploadModal          = document.getElementById("upload-modal");
   const closeUpload          = document.getElementById("close-upload");
@@ -54,6 +55,7 @@ Office.onReady(async ({ host }) => {
   let selectedSize   = 48;   // px — inserted icon size
   let selectedColor  = "Accent1";  // PowerPoint theme color
   let circleBackground = false;  // Add circle background to icons
+  let fillMode       = false;  // Use fill instead of stroke
   let uploadedIcons  = [];  // Temporary storage for bulk uploaded icons
   let toastTimer     = null;
 
@@ -190,8 +192,8 @@ Office.onReady(async ({ host }) => {
     const svgContentMatch = svg.match(/<svg[^>]*>(.*?)<\/svg>/s);
     const svgContent = svgContentMatch ? svgContentMatch[1] : svg;
 
-    // Determine if icon uses stroke or fill
-    const usesStroke = svg.includes('stroke="currentColor"') || svg.includes('stroke-width');
+    // Determine if icon uses stroke or fill (user can override with fillMode toggle)
+    const usesStroke = !fillMode && (svg.includes('stroke="currentColor"') || svg.includes('stroke-width'));
 
     if (usesStroke) {
       // For stroke icons: Use internal CSS with theme class (BrightCarbon method)
@@ -200,7 +202,7 @@ Office.onReady(async ({ host }) => {
 
       // Extract stroke-width and other properties from existing styles
       const styleMatch = modifiedContent.match(/<style[\s\S]*?<\/style>/);
-      let strokeWidth = '1.5'; // default
+      let strokeWidth = '1'; // default - matches PowerPoint 1pt
       let strokeLinecap = 'round';
       let strokeLinejoin = 'round';
 
@@ -217,6 +219,15 @@ Office.onReady(async ({ host }) => {
       }
 
       console.log(`[PPT] Extracted properties: stroke-width=${strokeWidth}, linecap=${strokeLinecap}, linejoin=${strokeLinejoin}`);
+
+      // Scale stroke-width to maintain constant 1pt appearance across all icon sizes
+      // Formula: Keep stroke constant in pixels regardless of icon size
+      // For 48px icon with viewBox 24x24: 1 viewBox unit = 2px, so we want stroke = 0.5 to get 1pt
+      const scaleFactor = selectedSize / 24; // How many pixels per viewBox unit
+      const targetStrokePt = 1; // Target stroke in points
+      const adjustedStrokeWidth = targetStrokePt / scaleFactor;
+
+      console.log(`[PPT] Icon size: ${selectedSize}px, Scale: ${scaleFactor}x, Adjusted stroke: ${adjustedStrokeWidth.toFixed(3)} (renders as ${targetStrokePt}pt)`);
 
       // Remove original styles and defs, we'll add cleaned version
       modifiedContent = modifiedContent.replace(/<style[\s\S]*?<\/style>/g, '');
@@ -264,7 +275,7 @@ Office.onReady(async ({ host }) => {
           .${strokeClass} {
             stroke: ${fallbackColor};
             fill: none !important;
-            stroke-width: ${strokeWidth}px;
+            stroke-width: ${adjustedStrokeWidth};
             stroke-linecap: ${strokeLinecap};
             stroke-linejoin: ${strokeLinejoin};
           }
@@ -279,14 +290,32 @@ Office.onReady(async ({ host }) => {
       const fillClass = `${themeClass}_Fill_v2`;
       let modifiedContent = svgContent;
 
-      // Extract properties from existing styles (though fill icons rarely have stroke-width)
+      // Extract stroke properties from existing styles
       const styleMatch = modifiedContent.match(/<style[\s\S]*?<\/style>/);
-      let strokeWidth = '';
+      let strokeWidth = '1'; // default - matches PowerPoint 1pt
+      let strokeLinecap = 'round';
+      let strokeLinejoin = 'round';
+
       if (styleMatch) {
         const styleContent = styleMatch[0];
         const swMatch = styleContent.match(/stroke-width:\s*([\d.]+)px/);
-        if (swMatch) strokeWidth = `stroke-width: ${swMatch[1]}px;`;
+        if (swMatch) strokeWidth = swMatch[1];
+
+        const lcMatch = styleContent.match(/stroke-linecap:\s*(\w+)/);
+        if (lcMatch) strokeLinecap = lcMatch[1];
+
+        const ljMatch = styleContent.match(/stroke-linejoin:\s*(\w+)/);
+        if (ljMatch) strokeLinejoin = ljMatch[1];
       }
+
+      console.log(`[PPT Fill] Extracted properties: stroke-width=${strokeWidth}, linecap=${strokeLinecap}, linejoin=${strokeLinejoin}`);
+
+      // Scale stroke-width to maintain constant 1pt appearance across all icon sizes
+      const scaleFactor = selectedSize / 24;
+      const targetStrokePt = 1;
+      const adjustedStrokeWidth = targetStrokePt / scaleFactor;
+
+      console.log(`[PPT Fill] Icon size: ${selectedSize}px, Scale: ${scaleFactor}x, Adjusted stroke: ${adjustedStrokeWidth.toFixed(3)} (renders as ${targetStrokePt}pt)`);
 
       // Remove original styles and defs
       modifiedContent = modifiedContent.replace(/<style[\s\S]*?<\/style>/g, '');
@@ -328,7 +357,13 @@ Office.onReady(async ({ host }) => {
 
       svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="${viewBox}">
         <style>
-          .${fillClass} { fill: ${fallbackColor}; ${strokeWidth} }
+          .${fillClass} {
+            fill: ${fallbackColor};
+            stroke: ${fallbackColor};
+            stroke-width: ${adjustedStrokeWidth};
+            stroke-linecap: ${strokeLinecap};
+            stroke-linejoin: ${strokeLinejoin};
+          }
           .MsftOfcThm_Background2_Fill_v2 { fill: #F5F5F5; }
         </style>
         ${backgroundCircle}
@@ -450,6 +485,12 @@ Office.onReady(async ({ host }) => {
   circleBackgroundToggle.addEventListener("change", () => {
     circleBackground = circleBackgroundToggle.checked;
     console.log("[Background] Circle background:", circleBackground);
+  });
+
+  // ---- Fill toggle ----
+  fillToggle.addEventListener("change", () => {
+    fillMode = fillToggle.checked;
+    console.log("[Fill] Fill mode:", fillMode);
   });
 
   // ---- Sign-in ----
@@ -620,19 +661,19 @@ Office.onReady(async ({ host }) => {
 
         // Auto-fix missing stroke-width
         if (hasStroke && !strokeWidthMatch) {
-          console.warn(`[Upload] ⚠️  "${iconName}": Missing stroke-width, adding default 1.5px`);
+          console.warn(`[Upload] ⚠️  "${iconName}": Missing stroke-width, adding default 1px`);
 
           // Add stroke-width to style blocks
           svgContent = svgContent.replace(/(<style[\s\S]*?)(stroke-linecap|stroke-linejoin|stroke:)/g,
-            (match, before, prop) => `${before}stroke-width: 1.5;\n            ${prop}`);
+            (match, before, prop) => `${before}stroke-width: 1;\n            ${prop}`);
 
-          console.log(`[Upload] ✓ "${iconName}": Auto-added stroke-width: 1.5px`);
+          console.log(`[Upload] ✓ "${iconName}": Auto-added stroke-width: 1px`);
         } else if (strokeWidthMatch) {
           const strokeWidth = parseFloat(strokeWidthMatch[1]);
-          const isStandardStroke = strokeWidth >= 1.0 && strokeWidth <= 2.0;
+          const isStandardStroke = strokeWidth >= 0.75 && strokeWidth <= 1.5;
 
           if (!isStandardStroke) {
-            console.warn(`[Upload] ⚠️  "${iconName}": Non-standard stroke-width ${strokeWidth}px (expected 1.5px)`);
+            console.warn(`[Upload] ⚠️  "${iconName}": Non-standard stroke-width ${strokeWidth}px (expected 1px to match PowerPoint 1pt)`);
           } else {
             console.log(`[Upload] ✓ "${iconName}": Standard stroke-width ${strokeWidth}px`);
           }
