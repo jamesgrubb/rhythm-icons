@@ -62,7 +62,32 @@ Search and replace these strings across the project:
 npm install
 ```
 
-### 4. Run in Development
+### 4. Set Up PostgreSQL Database
+
+This project uses PostgreSQL for multi-tenant icon storage. See [db/README.md](db/README.md) for detailed setup instructions.
+
+**Quick setup:**
+
+1. **Get a database** (choose one):
+   - Cloud: [Neon](https://neon.tech), [Railway](https://railway.app), or [Render](https://render.com) (free tiers available)
+   - Local: `brew install postgresql@15 && createdb rhythm_icons`
+
+2. **Configure `.env`** with your database URL:
+   ```env
+   DATABASE_URL=postgresql://user:password@host:5432/database
+   ```
+
+3. **Run migrations** to create tables:
+   ```bash
+   npm run db:migrate
+   ```
+
+4. **Seed sample data** (optional, for testing):
+   ```bash
+   npm run db:seed
+   ```
+
+### 5. Run in Development
 
 ```bash
 # Start the frontend dev server (HTTPS required by Office)
@@ -72,7 +97,7 @@ npm run dev
 npm run server
 ```
 
-### 5. Sideload the Add-in
+### 6. Sideload the Add-in
 
 **Word / PowerPoint (Desktop):**
 1. Open Word or PowerPoint
@@ -88,7 +113,33 @@ npm run server
 
 ## Adding Your Icons
 
-Edit the `ICONS` array in `backend/server.js` (or replace with a DB query). Each icon must follow this shape:
+Icons are now stored in PostgreSQL. You can add icons in three ways:
+
+### 1. Via API (Recommended)
+```bash
+POST /api/icons
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "id": "my-icon",
+  "name": "My Icon",
+  "category": "Category Name",
+  "svg": "<svg viewBox='0 0 24 24'>...</svg>"
+}
+```
+
+### 2. Via Database
+Insert directly into the `icons` table:
+```sql
+INSERT INTO icons (tenant_id, icon_id, name, category, svg, is_public)
+VALUES ('tenant-uuid', 'my-icon', 'My Icon', 'Category', '<svg>...</svg>', true);
+```
+
+### 3. Via Seed Files
+Add icons to `db/seeds/002_icons.js` and run `npm run db:seed`.
+
+Each icon must follow this shape:
 
 ```js
 {
