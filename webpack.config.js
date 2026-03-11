@@ -7,8 +7,16 @@ const os = require("os");
 
 // Only read SSL certs in development when they exist
 const isDevelopment = process.env.NODE_ENV !== 'production';
-const certPath = path.join(os.homedir(), '.office-addin-dev-certs/localhost.key');
-const hasCerts = isDevelopment && fs.existsSync(certPath);
+const certKeyPath = path.join(os.homedir(), '.office-addin-dev-certs/localhost.key');
+const certCrtPath = path.join(os.homedir(), '.office-addin-dev-certs/localhost.crt');
+const hasCerts = isDevelopment && fs.existsSync(certKeyPath) && fs.existsSync(certCrtPath);
+
+// Read certs only if they exist (to avoid ENOENT in production)
+let sslKey, sslCert;
+if (hasCerts) {
+  sslKey = fs.readFileSync(certKeyPath);
+  sslCert = fs.readFileSync(certCrtPath);
+}
 
 module.exports = {
   entry: {
@@ -54,8 +62,8 @@ module.exports = {
     server: {
       type: 'https',
       options: {
-        key: fs.readFileSync(path.join(os.homedir(), '.office-addin-dev-certs/localhost.key')),
-        cert: fs.readFileSync(path.join(os.homedir(), '.office-addin-dev-certs/localhost.crt')),
+        key: sslKey,
+        cert: sslCert,
       },
     },
     static:  path.join(__dirname, "dist"),
