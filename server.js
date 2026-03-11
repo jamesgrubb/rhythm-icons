@@ -246,8 +246,32 @@ app.post("/api/icons", requireAuth, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`[Server] Running on port ${PORT}`);
-  console.log(`[Server] JWT audience: ${AZURE_CLIENT_ID} | api://${AZURE_CLIENT_ID}`);
-  if (skipJwtVerify) console.warn("[Server] SKIP_JWT_VERIFY is ON — token signature not validated (dev only)");
+// Run migrations before starting server (production only)
+async function startServer() {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[Database] Running migrations...');
+    const knex = require('knex');
+    const knexConfig = require('./db/knexfile');
+    const db = knex(knexConfig);
+
+    try {
+      await db.migrate.latest();
+      console.log('[Database] Migrations completed successfully');
+      await db.destroy();
+    } catch (err) {
+      console.error('[Database] Migration failed:', err);
+      process.exit(1);
+    }
+  }
+
+  app.listen(PORT, () => {
+    console.log(`[Server] Running on port ${PORT}`);
+    console.log(`[Server] JWT audience: ${AZURE_CLIENT_ID} | api://${AZURE_CLIENT_ID}`);
+    if (skipJwtVerify) console.warn("[Server] SKIP_JWT_VERIFY is ON — token signature not validated (dev only)");
+  });
+}
+
+startServer().catch(err => {
+  console.error('[Server] Failed to start:', err);
+  process.exit(1);
 });
