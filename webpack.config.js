@@ -20,7 +20,7 @@ if (hasCerts) {
 
 module.exports = {
   entry: {
-    taskpane: ["./taskpane.css", "./taskpane.js", "./auth.js", "./icons.js"],
+    taskpane: ["./taskpane.css", "./auth.js", "./icons.js", "./taskpane.js"],
   },
   output: {
     path:     path.resolve(__dirname, "dist"),

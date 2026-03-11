@@ -127,9 +127,9 @@ app.use(helmet({
         "https://*.login.microsoftonline.com",
       ],
       imgSrc: ["'self'", "data:", "https:"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      fontSrc: ["'self'", "data:"],
-      frameSrc: ["'self'", "https://login.microsoftonline.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // Google Fonts
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"], // Google Fonts
+      frameSrc: ["'self'", "https://login.microsoftonline.com", "https://*.oaspapps.com"], // Office telemetry
       frameAncestors: ["*"], // Allow Office to embed the taskpane
     },
   },
