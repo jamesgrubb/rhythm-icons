@@ -2,6 +2,13 @@ const path               = require("path");
 const HtmlWebpackPlugin  = require("html-webpack-plugin");
 const CopyWebpackPlugin  = require("copy-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const fs = require("fs");
+const os = require("os");
+
+// Only read SSL certs in development when they exist
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const certPath = path.join(os.homedir(), '.office-addin-dev-certs/localhost.key');
+const hasCerts = isDevelopment && fs.existsSync(certPath);
 
 module.exports = {
   entry: {
@@ -42,13 +49,13 @@ module.exports = {
       ],
     }),
   ],
-  devServer: {
+  devServer: hasCerts ? {
     port:    3000,
     server: {
       type: 'https',
       options: {
-        key: require('fs').readFileSync(path.join(require('os').homedir(), '.office-addin-dev-certs/localhost.key')),
-        cert: require('fs').readFileSync(path.join(require('os').homedir(), '.office-addin-dev-certs/localhost.crt')),
+        key: fs.readFileSync(path.join(os.homedir(), '.office-addin-dev-certs/localhost.key')),
+        cert: fs.readFileSync(path.join(os.homedir(), '.office-addin-dev-certs/localhost.crt')),
       },
     },
     static:  path.join(__dirname, "dist"),
@@ -61,5 +68,8 @@ module.exports = {
         changeOrigin: true,
       },
     ],
+  } : {
+    // Minimal config for production build (devServer not actually used)
+    port: 3000,
   },
 };
