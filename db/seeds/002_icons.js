@@ -17,7 +17,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -32,7 +32,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -66,7 +66,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -79,7 +79,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-miterlimit: 10;
         }
@@ -94,7 +94,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #222831;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-miterlimit: 10;
         }
@@ -135,7 +135,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -163,7 +163,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #333;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -180,7 +180,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #231f20;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -205,7 +205,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #231f20;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -221,7 +221,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -250,7 +250,7 @@ exports.seed = async function(knex) {
 
         .cls-2 {
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-miterlimit: 10;
         }
@@ -295,7 +295,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -309,7 +309,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -332,7 +332,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -348,7 +348,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -362,7 +362,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -376,7 +376,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
           stroke-linejoin: round;
         }
@@ -397,7 +397,7 @@ exports.seed = async function(knex) {
         .cls-1, .cls-2 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-linecap: round;
         }
 
@@ -419,7 +419,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -432,7 +432,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -445,7 +445,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -458,7 +458,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: #fff;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -473,7 +473,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -490,7 +490,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -515,7 +515,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -532,7 +532,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -550,7 +550,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -565,7 +565,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
@@ -581,7 +581,7 @@ exports.seed = async function(knex) {
 
         .cls-1, .cls-2 {
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
 
@@ -613,7 +613,7 @@ exports.seed = async function(knex) {
 
         .cls-1, .cls-2 {
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
 
@@ -639,7 +639,7 @@ exports.seed = async function(knex) {
         .cls-1 {
           fill: none;
           stroke-width: 2;
-              stroke: #000;
+              stroke: currentColor;
           stroke-miterlimit: 10;
         }
       </style>
