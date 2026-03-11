@@ -402,8 +402,12 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 .icon-card.inserting { border-color: var(--accent); background: rgba(232,255,90,0.06); }
 .icon-card svg, .icon-card img {
   width: 28px; height: 28px;
-  color: var(--text);
+  color: var(--text-2);
   flex-shrink: 0;
+}
+/* Override stroke width for icon previews */
+.icon-card svg * {
+  stroke-width: 0.5px !important;
 }
 .icon-name {
   font-size: 9.5px;
@@ -601,7 +605,11 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 .preview-icon svg {
   width: 24px;
   height: 24px;
-  color: var(--text);
+  color: var(--text-2);
+}
+/* Override stroke width for upload preview icons */
+.preview-icon svg * {
+  stroke-width: 0.5px !important;
 }
 .export-section {
   display: flex;
