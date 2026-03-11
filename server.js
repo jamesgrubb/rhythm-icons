@@ -110,7 +110,30 @@ function requireAuth(req, res, next) {
 }
 
 // ---- Middleware ----
-app.use(helmet());
+// Configure helmet with Office Add-in compatible CSP
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'", // Office Add-ins may use inline scripts
+        "https://appsforoffice.microsoft.com", // Office.js
+        "https://alcdn.msauth.net", // MSAL.js
+      ],
+      connectSrc: [
+        "'self'",
+        "https://login.microsoftonline.com", // Azure AD authentication
+        "https://*.login.microsoftonline.com",
+      ],
+      imgSrc: ["'self'", "data:", "https:"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      fontSrc: ["'self'", "data:"],
+      frameSrc: ["'self'", "https://login.microsoftonline.com"],
+      frameAncestors: ["*"], // Allow Office to embed the taskpane
+    },
+  },
+}));
 app.use(cors({
   origin: [
     process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null,
