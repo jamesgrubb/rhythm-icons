@@ -111,7 +111,12 @@ function requireAuth(req, res, next) {
 
 // ---- Middleware ----
 app.use(helmet());
-app.use(cors({ origin: ["https://YOUR-DOMAIN", "https://localhost:3000"] }));
+app.use(cors({
+  origin: [
+    process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null,
+    "https://localhost:3000" // Keep for local development
+  ].filter(Boolean)
+}));
 app.use(express.json());
 
 // ---- Serve static taskpane files ----

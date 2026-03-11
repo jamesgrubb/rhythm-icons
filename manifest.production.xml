@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>12345678-1234-1234-1234-123456789abc</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Your Company</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Icon Library" />
+  <Description DefaultValue="Browse and insert curated icons into your document." />
+
+  <IconUrl DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/icon-64.png" />
+  <SupportUrl DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/" />
+
+  <AppDomains>
+    <AppDomain>https://YOUR-RAILWAY-DOMAIN.up.railway.app</AppDomain>
+    <AppDomain>https://login.microsoftonline.com</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Document" /> <!-- Word -->
+    <Host Name="Presentation" /> <!-- PowerPoint -->
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/taskpane.html" />
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+
+      <!-- WORD -->
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title" />
+            <Description resid="GetStarted.Description" />
+            <LearnMoreUrl resid="LearnMoreUrl" />
+          </GetStarted>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="CommandsGroup">
+                <Label resid="CommandsGroup.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
+                </Icon>
+                <Control xsi:type="Button" id="OpenPaneButton">
+                  <Label resid="OpenPaneButton.Label" />
+                  <Supertip>
+                    <Title resid="OpenPaneButton.Label" />
+                    <Description resid="OpenPaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16" />
+                    <bt:Image size="32" resid="Icon.32x32" />
+                    <bt:Image size="80" resid="Icon.80x80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>ButtonId1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+
+      <!-- POWERPOINT -->
+      <Host xsi:type="Presentation">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title" />
+            <Description resid="GetStarted.Description" />
+            <LearnMoreUrl resid="LearnMoreUrl" />
+          </GetStarted>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="CommandsGroup">
+                <Label resid="CommandsGroup.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16" />
+                  <bt:Image size="32" resid="Icon.32x32" />
+                  <bt:Image size="80" resid="Icon.80x80" />
+                </Icon>
+                <Control xsi:type="Button" id="OpenPaneButtonPPT">
+                  <Label resid="OpenPaneButton.Label" />
+                  <Supertip>
+                    <Title resid="OpenPaneButton.Label" />
+                    <Description resid="OpenPaneButton.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16" />
+                    <bt:Image size="32" resid="Icon.32x32" />
+                    <bt:Image size="80" resid="Icon.80x80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>ButtonId2</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/icon-16.png" />
+        <bt:Image id="Icon.32x32" DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/icon-32.png" />
+        <bt:Image id="Icon.80x80" DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/taskpane.html" />
+        <bt:Url id="LearnMoreUrl" DefaultValue="https://YOUR-RAILWAY-DOMAIN.up.railway.app/" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="Icon Library is ready!" />
+        <bt:String id="CommandsGroup.Label" DefaultValue="Icon Library" />
+        <bt:String id="OpenPaneButton.Label" DefaultValue="Insert Icon" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Browse and insert curated icons. Sign in to get started." />
+        <bt:String id="OpenPaneButton.Tooltip" DefaultValue="Open the icon library to browse and insert icons." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

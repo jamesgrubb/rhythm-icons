@@ -7,7 +7,7 @@ window.AUTH_CONFIG = {
   // Azure App Registration values
   clientId:    "19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c",
   tenantId:    "dbd0413f-9515-4bd1-945a-1948b655558b",
-  redirectUri: "https://localhost:3000/taskpane.html",
+  redirectUri: window.location.origin + "/taskpane.html", // Auto-detects localhost or production domain
 
   // Scopes your API requires
   scopes: ["openid", "profile", "email"],
