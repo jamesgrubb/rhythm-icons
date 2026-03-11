@@ -504,6 +504,7 @@ Office.onReady(async ({ host }) => {
       showScreen("main");
     } catch (err) {
       console.error("[Auth] Sign-in failed:", err);
+      if (err.status === 401) clearCurrentSession();
       setAuthError("Sign-in failed. Please try again.");
       signinBtn.disabled = false;
       signinBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M11.5 2.75h-8a.75.75 0 00-.75.75v17a.75.75 0 00.75.75h8M16 7.5l4.5 4.5-4.5 4.5M20.5 12h-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Sign in with Microsoft`;
@@ -557,8 +558,16 @@ Office.onReady(async ({ host }) => {
       await initMsal();
       const token = await tryRestoreSession();
       if (token) {
-        await loadIcons(token);
-        showScreen("main");
+        try {
+          await loadIcons(token);
+          showScreen("main");
+        } catch (loadErr) {
+          if (loadErr.status === 401) {
+            clearCurrentSession();
+            console.warn("[Bootstrap] Token rejected (401), showing sign-in");
+          }
+          showScreen("auth");
+        }
       } else {
         showScreen("auth");
       }

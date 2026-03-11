@@ -3,7 +3,7 @@
 //  Replace ICON_API_BASE with your backend URL.
 // =============================================
 
-const ICON_API_BASE = "http://localhost:3001/api";
+const ICON_API_BASE = "/api"; // Proxied to backend via webpack devServer
 
 // ---- LOCAL FALLBACK / SAMPLE DATA ----
 // Replace or supplement this with a real API call (see fetchIconsFromAPI below).
@@ -1413,9 +1413,25 @@ async function fetchIconsFromAPI(accessToken) {
     const res = await fetch(`${ICON_API_BASE}/icons`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!res.ok) throw new Error(`API ${res.status}`);
+    if (!res.ok) {
+      const body = await res.text();
+      let parsed;
+      try {
+        parsed = JSON.parse(body);
+      } catch (_) {
+        parsed = null;
+      }
+      if (parsed?.debug) {
+        console.warn("[Icons] API 401 – token debug from server:", parsed.debug);
+      }
+      console.warn(`[Icons] API ${res.status} ${res.statusText}`, body.slice(0, 200));
+      const err = new Error(`API ${res.status}`);
+      err.status = res.status; // so caller can show re-auth on 401
+      throw err;
+    }
     return await res.json(); // expects same shape as SAMPLE_ICONS
   } catch (err) {
+    if (err.status === 401) throw err; // let caller handle re-auth
     console.warn("[Icons] API fetch failed, using sample data:", err.message);
     return SAMPLE_ICONS;
   }

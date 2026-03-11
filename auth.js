@@ -4,15 +4,14 @@
 // =============================================
 
 window.AUTH_CONFIG = {
-  // ⚠️  Replace these with your Azure App Registration values
-  clientId:    "YOUR-AZURE-APP-CLIENT-ID",
-  tenantId:    "YOUR-AZURE-TENANT-ID",   // or "common" for multi-tenant
-  redirectUri: "https://YOUR-DOMAIN/taskpane.html",
+  // Azure App Registration values
+  clientId:    "19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c",
+  tenantId:    "dbd0413f-9515-4bd1-945a-1948b655558b",
+  redirectUri: "https://localhost:3000/taskpane.html",
 
-  // Scopes your API requires. Add your own API scope here.
-  // e.g. "api://YOUR-APP-CLIENT-ID/Icons.Read"
+  // Scopes your API requires
   scopes: ["openid", "profile", "email"],
-  apiScope: "api://YOUR-AZURE-APP-CLIENT-ID/Icons.Read",
+  apiScope: "api://19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c/Icons.Read",
 };
 const AUTH_CONFIG = window.AUTH_CONFIG;
 
@@ -38,6 +37,9 @@ const msalConfig = {
 let msalInstance = null;
 let currentAccount = null;
 
+/** Only one interactive flow at a time (avoids interaction_in_progress). */
+let interactionPromise = null;
+
 /**
  * Initialise MSAL. Called once Office.js is ready.
  */
@@ -47,43 +49,63 @@ function initMsal() {
 }
 
 /**
+ * Run one interactive auth at a time; if one is already running, wait for it.
+ * Returns the result of the given async fn.
+ */
+async function withInteractionLock(fn) {
+  while (interactionPromise) {
+    await interactionPromise.catch(() => {});
+  }
+  const p = fn();
+  interactionPromise = p;
+  try {
+    return await p;
+  } finally {
+    interactionPromise = null;
+  }
+}
+
+/**
  * Attempt silent sign-in first; fall back to popup.
  * Returns an access token string, or throws.
+ * Serialized so only one sign-in popup runs at a time.
  */
 async function signIn() {
   if (!msalInstance) throw new Error("MSAL not initialised");
 
-  const tokenRequest = {
-    scopes: [AUTH_CONFIG.apiScope, ...AUTH_CONFIG.scopes],
-    prompt: "select_account",
-  };
+  return withInteractionLock(async () => {
+    const tokenRequest = {
+      scopes: [AUTH_CONFIG.apiScope], // Only request API scope - openid/profile/email are automatic
+      prompt: "select_account",
+    };
 
-  // Try silent first (cached session)
-  const accounts = msalInstance.getAllAccounts();
-  if (accounts.length > 0) {
-    try {
-      const silentResult = await msalInstance.acquireTokenSilent({
-        ...tokenRequest,
-        account: accounts[0],
-      });
-      currentAccount = silentResult.account;
-      return silentResult.accessToken;
-    } catch (silentErr) {
-      // Falls through to popup
-      console.warn("[Auth] Silent token acquisition failed, trying popup", silentErr);
+    // Try silent first (cached session)
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        const silentResult = await msalInstance.acquireTokenSilent({
+          ...tokenRequest,
+          account: accounts[0],
+        });
+        currentAccount = silentResult.account;
+        return silentResult.accessToken;
+      } catch (silentErr) {
+        // Falls through to popup
+        console.warn("[Auth] Silent token acquisition failed, trying popup", silentErr);
+      }
     }
-  }
 
-  // Popup sign-in
-  const popupResult = await msalInstance.loginPopup(tokenRequest);
-  currentAccount = popupResult.account;
+    // Popup sign-in (only one at a time)
+    const popupResult = await msalInstance.loginPopup(tokenRequest);
+    currentAccount = popupResult.account;
 
-  // Immediately acquire the token after login
-  const tokenResult = await msalInstance.acquireTokenSilent({
-    ...tokenRequest,
-    account: currentAccount,
+    // Immediately acquire the token after login
+    const tokenResult = await msalInstance.acquireTokenSilent({
+      ...tokenRequest,
+      account: currentAccount,
+    });
+    return tokenResult.accessToken;
   });
-  return tokenResult.accessToken;
 }
 
 /**
@@ -97,14 +119,26 @@ async function getAccessToken() {
       scopes: [AUTH_CONFIG.apiScope],
       account: currentAccount,
     });
+    console.log("[Auth] Token acquired - scopes:", result.scopes);
+    console.log("[Auth] Token preview:", result.accessToken.substring(0, 50) + "...");
+    // Decode JWT to check audience (for debugging)
+    const payload = JSON.parse(atob(result.accessToken.split('.')[1]));
+    console.log("[Auth] Token audience:", payload.aud);
+    console.log("[Auth] Expected audience:", AUTH_CONFIG.clientId);
     return result.accessToken;
-  } catch {
-    // Token expired — re-acquire via popup
-    const result = await msalInstance.acquireTokenPopup({
-      scopes: [AUTH_CONFIG.apiScope],
-      account: currentAccount,
+  } catch (err) {
+    console.warn("[Auth] Silent token failed:", err);
+    // Token expired — re-acquire via popup (one interactive flow at a time)
+    return withInteractionLock(async () => {
+      const result = await msalInstance.acquireTokenPopup({
+        scopes: [AUTH_CONFIG.apiScope],
+        account: currentAccount,
+      });
+      console.log("[Auth] Popup token acquired - scopes:", result.scopes);
+      const payload = JSON.parse(atob(result.accessToken.split('.')[1]));
+      console.log("[Auth] Token audience:", payload.aud);
+      return result.accessToken;
     });
-    return result.accessToken;
   }
 }
 
@@ -114,6 +148,14 @@ async function getAccessToken() {
 async function signOut() {
   if (!msalInstance) return;
   await msalInstance.logoutPopup({ account: currentAccount });
+  currentAccount = null;
+}
+
+/**
+ * Clear current session without opening logout popup (e.g. after 401).
+ * Next sign-in will use cached account if any and try silent or popup.
+ */
+function clearCurrentSession() {
   currentAccount = null;
 }
 
@@ -149,3 +191,4 @@ window.initMsal = initMsal;
 window.signIn = signIn;
 window.signOut = signOut;
 window.tryRestoreSession = tryRestoreSession;
+window.clearCurrentSession = clearCurrentSession;

@@ -53,5 +53,13 @@ module.exports = {
     },
     static:  path.join(__dirname, "dist"),
     headers: { "Access-Control-Allow-Origin": "*" },
+    proxy: [
+      {
+        context: ['/api'],
+        target: 'http://localhost:3001',
+        secure: false,
+        changeOrigin: true,
+      },
+    ],
   },
 };
