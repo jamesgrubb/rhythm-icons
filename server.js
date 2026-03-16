@@ -177,8 +177,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// ---- Serve static taskpane files ----
-app.use(express.static("dist")); // your built frontend goes here
+// ---- Serve static files ----
+app.use(express.static("dist")); // Built frontend (webpack output)
+app.use(express.static("public")); // Legal pages and support content
 
 // ---- Helper: Get tenant ID from user ----
 // In a real app, you'd look up the user's tenant_id from the users table
