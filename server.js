@@ -109,6 +109,41 @@ function requireAuth(req, res, next) {
   );
 }
 
+// ---- Tenant Auto-Provisioning Middleware ----
+async function ensureTenantExists(req, res, next) {
+  const azureTenantId = req.user.tid; // Azure AD tenant ID from JWT
+  const tenantName = req.user.tenant_ctry || req.user.name || azureTenantId; // Use org name if available
+
+  if (!azureTenantId) {
+    console.error("[Tenant] No tenant ID in JWT token");
+    return res.status(400).json({ error: "Invalid token: missing tenant ID" });
+  }
+
+  try {
+    // Check if tenant exists
+    const existing = await pool.query(
+      'SELECT id FROM tenants WHERE azure_tenant_id = $1',
+      [azureTenantId]
+    );
+
+    if (existing.rows.length === 0) {
+      // Create new tenant
+      await pool.query(
+        'INSERT INTO tenants (azure_tenant_id, name, created_at) VALUES ($1, $2, NOW())',
+        [azureTenantId, tenantName]
+      );
+      console.log('[Tenant] Auto-provisioned new tenant:', azureTenantId, '-', tenantName);
+    }
+
+    next();
+  } catch (error) {
+    console.error('[Tenant] Error provisioning tenant:', error);
+    // Don't fail the request - log error and continue
+    // Fallback to default tenant will happen in getTenantId()
+    next();
+  }
+}
+
 // ---- Middleware ----
 // Configure helmet with Office Add-in compatible CSP
 app.use(helmet({
@@ -178,7 +213,7 @@ async function getTenantId(user) {
 // ---- Icons API ----
 
 // GET /api/icons — returns icon list filtered by tenant
-app.get("/api/icons", requireAuth, async (req, res) => {
+app.get("/api/icons", requireAuth, ensureTenantExists, async (req, res) => {
   console.log("[API] GET /api/icons — auth OK, user:", req.user?.sub ?? req.user?.oid);
   try {
     const tenantId = await getTenantId(req.user);
@@ -204,7 +239,7 @@ app.get("/api/icons", requireAuth, async (req, res) => {
 });
 
 // GET /api/icons/:id — fetch a single icon
-app.get("/api/icons/:id", requireAuth, async (req, res) => {
+app.get("/api/icons/:id", requireAuth, ensureTenantExists, async (req, res) => {
   try {
     const tenantId = await getTenantId(req.user);
 
@@ -232,7 +267,7 @@ app.get("/api/icons/:id", requireAuth, async (req, res) => {
 });
 
 // POST /api/icons — add a new icon (admin only — check roles in req.user)
-app.post("/api/icons", requireAuth, async (req, res) => {
+app.post("/api/icons", requireAuth, ensureTenantExists, async (req, res) => {
   const { id, name, category, svg } = req.body;
 
   if (!id || !name || !category || !svg) {

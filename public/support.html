@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support - Rhythm Icons</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        h1 {
+            color: #0078d4;
+            border-bottom: 2px solid #0078d4;
+            padding-bottom: 0.5rem;
+        }
+        h2 {
+            color: #106ebe;
+            margin-top: 2rem;
+        }
+        .support-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        .support-card {
+            background: #f5f5f5;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #0078d4;
+        }
+        .support-card h3 {
+            margin-top: 0;
+            color: #0078d4;
+        }
+        .faq-item {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .faq-question {
+            font-weight: 600;
+            color: #106ebe;
+            margin-bottom: 0.5rem;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        .steps {
+            counter-reset: step-counter;
+            list-style: none;
+            padding-left: 0;
+        }
+        .steps li {
+            counter-increment: step-counter;
+            margin-bottom: 1rem;
+            padding-left: 2.5rem;
+            position: relative;
+        }
+        .steps li::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: #0078d4;
+            color: white;
+            width: 1.8rem;
+            height: 1.8rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        a {
+            color: #0078d4;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>Support & Help Center</h1>
+    <p>Welcome to the Rhythm Icons support center. Find answers to common questions and get help with installation and troubleshooting.</p>
+
+    <div class="support-grid">
+        <div class="support-card">
+            <h3>📧 Email Support</h3>
+            <p>For technical support and general inquiries:</p>
+            <p><a href="mailto:support@spectrum-science.com">support@spectrum-science.com</a></p>
+        </div>
+        <div class="support-card">
+            <h3>👤 Account & Billing</h3>
+            <p>For account-related questions:</p>
+            <p><a href="mailto:accounts@spectrum-science.com">accounts@spectrum-science.com</a></p>
+        </div>
+        <div class="support-card">
+            <h3>🔧 IT Administrator Help</h3>
+            <p>For deployment assistance:</p>
+            <p><a href="mailto:it-support@spectrum-science.com">it-support@spectrum-science.com</a></p>
+        </div>
+    </div>
+
+    <h2>Quick Start Guide</h2>
+
+    <h3>Installing the Add-in (IT Administrators)</h3>
+    <ol class="steps">
+        <li>Sign in to <a href="https://admin.microsoft.com" target="_blank">Microsoft 365 Admin Center</a></li>
+        <li>Navigate to <strong>Settings → Integrated apps → Add-ins</strong></li>
+        <li>Click <strong>Deploy Add-in</strong> and select <strong>Upload custom apps</strong></li>
+        <li>Choose <strong>I have a manifest file (XML)</strong> and upload the manifest file</li>
+        <li>Select who gets access (specific users/groups or everyone)</li>
+        <li>Click <strong>Deploy</strong> and wait up to 24 hours for deployment to complete</li>
+    </ol>
+
+    <h3>Using the Add-in (End Users)</h3>
+    <ol class="steps">
+        <li>Open Microsoft Word or PowerPoint</li>
+        <li>Go to <strong>Insert → Add-ins → My Add-ins</strong></li>
+        <li>Click on <strong>Rhythm Icons</strong> to launch the taskpane</li>
+        <li>Sign in with your Microsoft 365 account when prompted</li>
+        <li>Search for icons, customize size/color, and click to insert</li>
+    </ol>
+
+    <h2>Frequently Asked Questions</h2>
+
+    <div class="faq-item">
+        <div class="faq-question">Q: The add-in isn't appearing in my Office apps. What should I do?</div>
+        <div class="faq-answer">
+            <p><strong>A:</strong> After your IT administrator deploys the add-in, it can take up to 24 hours to appear. Try these steps:</p>
+            <ul>
+                <li>Close and reopen Word/PowerPoint</li>
+                <li>Check if you're signed in with your organizational account (not a personal Microsoft account)</li>
+                <li>Verify with your IT admin that the add-in was deployed to your user or group</li>
+                <li>Clear your Office cache: <code>%LOCALAPPDATA%\Microsoft\Office\16.0\Wef\</code> (Windows) or <code>~/Library/Containers/com.microsoft.Word/Data/Library/Caches/</code> (Mac)</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-question">Q: I'm getting a sign-in error. How do I fix this?</div>
+        <div class="faq-answer">
+            <p><strong>A:</strong> Sign-in issues are usually related to authentication. Try these steps:</p>
+            <ul>
+                <li>Ensure you're using your <strong>organizational</strong> Microsoft 365 account (personal accounts are not supported)</li>
+                <li>Clear your browser cookies and cache</li>
+                <li>Try signing out of Office and signing back in</li>
+                <li>Check if your organization has conditional access policies that might be blocking the add-in</li>
+                <li>Contact your IT administrator to verify Azure AD app permissions are properly configured</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-question">Q: Can I upload my own custom icons?</div>
+        <div class="faq-answer">
+            <p><strong>A:</strong> Yes! The add-in supports bulk icon upload:</p>
+            <ul>
+                <li>Click the <strong>Upload Icons</strong> button in the taskpane</li>
+                <li>Select one or more SVG files from your computer</li>
+                <li>Choose a category for the icons</li>
+                <li>Preview the icons and click <strong>Add to Library</strong></li>
+                <li>Custom icons are stored per tenant and only visible to users in your organization</li>
+            </ul>
+            <p><strong>Note:</strong> Icons must be in SVG format with a standard viewBox (0 0 24 24) and 2px stroke width for best results.</p>
+        </div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-question">Q: Icons aren't inserting into my document. What's wrong?</div>
+        <div class="faq-answer">
+            <p><strong>A:</strong> If icons aren't inserting, check:</p>
+            <ul>
+                <li>You have edit permissions for the document</li>
+                <li>The document isn't in protected or restricted editing mode</li>
+                <li>You're not in Read Mode (Word) or Slide Show mode (PowerPoint)</li>
+                <li>Try clicking on a different part of the document before inserting</li>
+                <li>Check the browser console (F12) for error messages and send them to support</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-question">Q: How do I change icon colors in PowerPoint?</div>
+        <div class="faq-answer">
+            <p><strong>A:</strong> PowerPoint icons support theme colors:</p>
+            <ul>
+                <li>Click the <strong>color selector</strong> at the bottom of the taskpane before inserting</li>
+                <li>Choose from PowerPoint theme colors (Accent1-6, Text1-2, Background1-2)</li>
+                <li>After inserting, you can further customize colors by right-clicking the icon and selecting <strong>Format Picture</strong></li>
+                <li>Icons will automatically adapt to your presentation's theme colors</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-question">Q: Can I use these icons in commercial projects?</div>
+        <div class="faq-answer">
+            <p><strong>A:</strong> Yes! Icons from the standard library can be used in:</p>
+            <ul>
+                <li>Client deliverables and presentations</li>
+                <li>Marketing materials</li>
+                <li>Publications and reports</li>
+                <li>Internal business documents</li>
+            </ul>
+            <p>See our <a href="/terms">Terms of Service</a> for full usage rights and restrictions.</p>
+        </div>
+    </div>
+
+    <div class="faq-item">
+        <div class="faq-question">Q: How do I remove the add-in?</div>
+        <div class="faq-answer">
+            <p><strong>A:</strong> To remove the add-in:</p>
+            <p><strong>For end users:</strong></p>
+            <ul>
+                <li>In Word/PowerPoint, go to <strong>Insert → Add-ins → My Add-ins</strong></li>
+                <li>Right-click on <strong>Rhythm Icons</strong> and select <strong>Remove</strong></li>
+            </ul>
+            <p><strong>For IT administrators:</strong></p>
+            <ul>
+                <li>Go to <a href="https://admin.microsoft.com" target="_blank">Microsoft 365 Admin Center</a></li>
+                <li>Navigate to <strong>Settings → Integrated apps</strong></li>
+                <li>Find <strong>Rhythm Icons</strong> and click <strong>Remove</strong></li>
+            </ul>
+        </div>
+    </div>
+
+    <h2>System Requirements</h2>
+    <ul>
+        <li><strong>Office Applications:</strong> Word 2016 or later, PowerPoint 2016 or later (Desktop, Online, or Mobile)</li>
+        <li><strong>Operating Systems:</strong> Windows 10+, macOS 10.14+, iOS 12+, Android 6.0+</li>
+        <li><strong>Browser:</strong> Microsoft Edge, Google Chrome, Safari, or Firefox (for Office Online)</li>
+        <li><strong>Account:</strong> Microsoft 365 organizational account with Word/PowerPoint license</li>
+        <li><strong>Internet:</strong> Active internet connection required for authentication and icon library access</li>
+    </ul>
+
+    <h2>Troubleshooting</h2>
+
+    <h3>Icon appears blurry or pixelated</h3>
+    <p>Try selecting a larger icon size before inserting. For PowerPoint, use 64px or 96px for better quality in presentations.</p>
+
+    <h3>Add-in crashes or freezes</h3>
+    <p>This is usually caused by browser cache issues. Try:</p>
+    <ol>
+        <li>Close all Office applications</li>
+        <li>Clear your browser cache (the add-in uses your browser's rendering engine)</li>
+        <li>Reopen Office and try again</li>
+    </ol>
+
+    <h3>Can't find a specific icon</h3>
+    <p>Use the search bar at the top of the taskpane. You can search by:</p>
+    <ul>
+        <li>Icon name (e.g., "heart", "diabetes")</li>
+        <li>Category (e.g., "Custom")</li>
+        <li>Related terms</li>
+    </ul>
+
+    <h2>Data & Privacy</h2>
+    <p>We take your privacy seriously. Learn more about how we collect, use, and protect your data:</p>
+    <ul>
+        <li><a href="/privacy">Privacy Policy</a></li>
+        <li><a href="/terms">Terms of Service</a></li>
+    </ul>
+
+    <h2>Feature Requests & Feedback</h2>
+    <p>We'd love to hear your suggestions! Send feature requests and feedback to:</p>
+    <p><a href="mailto:feedback@spectrum-science.com">feedback@spectrum-science.com</a></p>
+
+    <hr style="margin: 3rem 0; border: none; border-top: 1px solid #ddd;">
+    <p style="text-align: center; color: #666; font-size: 0.9rem;">
+        © 2026 Spectrum Science Communications, LLC. All rights reserved.<br>
+        <a href="/privacy">Privacy Policy</a> | <a href="/terms">Terms of Service</a>
+    </p>
+</body>
+</html>

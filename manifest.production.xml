@@ -6,16 +6,16 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
 
-  <Id>12345678-1234-1234-1234-123456789abc</Id>
+  <Id>aa1b0280-bef3-4092-9b40-f2a7eb73b377</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>Your Company</ProviderName>
+  <ProviderName>Spectrum Science Communications, LLC</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Icon Library" />
-  <Description DefaultValue="Browse and insert curated icons into your document." />
+  <DisplayName DefaultValue="Rhythm Icons Library" />
+  <Description DefaultValue="Browse and insert curated medical and scientific icons into your Word and PowerPoint documents." />
 
   <IconUrl DefaultValue="https://rhythm-icons-production.up.railway.app/icon-32.png" />
   <HighResolutionIconUrl DefaultValue="https://rhythm-icons-production.up.railway.app/icon-64.png" />
-  <SupportUrl DefaultValue="https://rhythm-icons-production.up.railway.app/" />
+  <SupportUrl DefaultValue="https://rhythm-icons-production.up.railway.app/support" />
 
   <AppDomains>
     <AppDomain>https://rhythm-icons-production.up.railway.app</AppDomain>
@@ -128,8 +128,8 @@
         <bt:Url id="LearnMoreUrl" DefaultValue="https://rhythm-icons-production.up.railway.app/" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="Icon Library is ready!" />
-        <bt:String id="CommandsGroup.Label" DefaultValue="Icon Library" />
+        <bt:String id="GetStarted.Title" DefaultValue="Rhythm Icons is ready!" />
+        <bt:String id="CommandsGroup.Label" DefaultValue="Rhythm Icons" />
         <bt:String id="OpenPaneButton.Label" DefaultValue="Insert Icon" />
       </bt:ShortStrings>
       <bt:LongStrings>
