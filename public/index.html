@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rhythm Icons - Microsoft Office Add-in</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 3rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .tagline {
+            color: #666;
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+        }
+        .download-section {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+            border-left: 4px solid #667eea;
+        }
+        .download-btn {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 1rem 2rem;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: background 0.3s;
+        }
+        .download-btn:hover {
+            background: #5568d3;
+        }
+        .steps {
+            counter-reset: step;
+            list-style: none;
+            padding: 0;
+        }
+        .steps li {
+            counter-increment: step;
+            margin-bottom: 1.5rem;
+            padding-left: 3rem;
+            position: relative;
+        }
+        .steps li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: #667eea;
+            color: white;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        .feature {
+            text-align: center;
+            padding: 1rem;
+        }
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .links {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 1rem;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Rhythm Icons</h1>
+        <p class="tagline">Professional medical and scientific icons for Microsoft Word & PowerPoint</p>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">📚</div>
+                <h3>Curated Library</h3>
+                <p>30+ medical & scientific icons</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎨</div>
+                <h3>Customizable</h3>
+                <p>Change size, color, and style</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">☁️</div>
+                <h3>Cloud Sync</h3>
+                <p>Upload your own custom icons</p>
+            </div>
+        </div>
+
+        <div class="download-section">
+            <h2>📥 Download for Your Organization</h2>
+            <p><strong>For IT Administrators:</strong> Download the manifest file and deploy to your organization via Microsoft 365 Admin Center.</p>
+            <p style="margin-top: 1.5rem;">
+                <a href="/manifest.xml" class="download-btn" download>⬇️ Download Manifest File</a>
+            </p>
+        </div>
+
+        <h2>Quick Start Guide</h2>
+        <div class="note">
+            <strong>👤 For IT Administrators Only:</strong> End users don't need to do anything - the add-in will appear automatically after you deploy it!
+        </div>
+
+        <h3>Deployment Steps (IT Admins):</h3>
+        <ol class="steps">
+            <li>
+                <strong>Download the manifest file</strong> above
+            </li>
+            <li>
+                <strong>Sign in to Microsoft 365 Admin Center</strong> at <a href="https://admin.microsoft.com" target="_blank">admin.microsoft.com</a>
+            </li>
+            <li>
+                <strong>Go to Settings → Integrated apps → Add-ins</strong>
+            </li>
+            <li>
+                <strong>Click "Deploy Add-in"</strong> and select "Upload custom apps"
+            </li>
+            <li>
+                <strong>Upload the manifest.xml file</strong> you downloaded
+            </li>
+            <li>
+                <strong>Choose who gets access</strong> (specific users/groups or everyone)
+            </li>
+            <li>
+                <strong>Click Deploy</strong> - Done! The add-in will appear in Word and PowerPoint within 1-24 hours
+            </li>
+        </ol>
+
+        <h3>For End Users:</h3>
+        <p>Once deployed, users can find the add-in in:</p>
+        <ul>
+            <li><strong>Word/PowerPoint:</strong> Insert tab → Add-ins → Rhythm Icons</li>
+            <li>Click the icon button to open the taskpane</li>
+            <li>Sign in with Microsoft (first time only)</li>
+            <li>Browse, search, and insert icons!</li>
+        </ul>
+
+        <div class="links">
+            <a href="/support">📚 Support & FAQ</a>
+            <a href="/privacy">🔒 Privacy Policy</a>
+            <a href="/terms">📋 Terms of Service</a>
+        </div>
+
+        <div style="text-align: center; margin-top: 3rem; color: #666; font-size: 0.9rem;">
+            <p>© 2026 Spectrum Science Communications, LLC</p>
+            <p>Questions? Contact <a href="mailto:support@spectrum-science.com">support@spectrum-science.com</a></p>
+        </div>
+    </div>
+</body>
+</html>

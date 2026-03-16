@@ -186,6 +186,12 @@ app.get("/privacy", (req, res) => res.sendFile(__dirname + "/public/privacy.html
 app.get("/terms", (req, res) => res.sendFile(__dirname + "/public/terms.html"));
 app.get("/support", (req, res) => res.sendFile(__dirname + "/public/support.html"));
 
+// ---- Manifest download route ----
+app.get("/manifest.xml", (req, res) => {
+  res.set("Content-Type", "application/xml");
+  res.sendFile(__dirname + "/public/manifest.xml");
+});
+
 // ---- Helper: Get tenant ID from user ----
 // In a real app, you'd look up the user's tenant_id from the users table
 // For now, we'll use a default tenant or extract from Azure AD claims
