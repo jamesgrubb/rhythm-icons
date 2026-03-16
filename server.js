@@ -181,6 +181,11 @@ app.use(express.json());
 app.use(express.static("dist")); // Built frontend (webpack output)
 app.use(express.static("public")); // Legal pages and support content
 
+// ---- Legal page routes (allow URLs without .html extension) ----
+app.get("/privacy", (req, res) => res.sendFile(__dirname + "/public/privacy.html"));
+app.get("/terms", (req, res) => res.sendFile(__dirname + "/public/terms.html"));
+app.get("/support", (req, res) => res.sendFile(__dirname + "/public/support.html"));
+
 // ---- Helper: Get tenant ID from user ----
 // In a real app, you'd look up the user's tenant_id from the users table
 // For now, we'll use a default tenant or extract from Azure AD claims
