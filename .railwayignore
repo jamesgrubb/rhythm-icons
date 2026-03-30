@@ -1,0 +1,9 @@
+# Files to exclude from Railway deployment
+node_modules/
+.git/
+.env.local
+.test-token
+*.log
+.DS_Store
+.vscode/
+.idea/

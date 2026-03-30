@@ -28,6 +28,7 @@
     "pg": "^8.20.0"
   },
   "devDependencies": {
+    "@azure/msal-node": "^5.1.1",
     "@babel/core": "^7.22.0",
     "@babel/preset-env": "^7.22.0",
     "babel-loader": "^9.1.3",

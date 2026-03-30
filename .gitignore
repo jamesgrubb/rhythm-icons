@@ -27,3 +27,6 @@ Thumbs.db
 *.tmp
 *.swp
 *~
+
+# Testing tokens (sensitive)
+.test-token
