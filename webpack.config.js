@@ -49,6 +49,11 @@ module.exports = {
       template: "./taskpane.html",
       chunks:   ["taskpane"],
     }),
+    new HtmlWebpackPlugin({
+      filename: "auth-dialog.html",
+      template: "./auth-dialog.html",
+      chunks:   [], // No webpack bundles needed, uses CDN scripts
+    }),
     new MiniCssExtractPlugin({ filename: "[name].css" }),
     new CopyWebpackPlugin({
       patterns: [

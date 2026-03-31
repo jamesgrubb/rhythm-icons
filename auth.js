@@ -66,16 +66,16 @@ async function withInteractionLock(fn) {
 }
 
 /**
- * Attempt silent sign-in first; fall back to popup.
+ * Attempt silent sign-in first; fall back to Office Dialog.
  * Returns an access token string, or throws.
- * Serialized so only one sign-in popup runs at a time.
+ * Uses Office Dialog API for proper authentication in add-ins.
  */
 async function signIn() {
   if (!msalInstance) throw new Error("MSAL not initialised");
 
   return withInteractionLock(async () => {
     const tokenRequest = {
-      scopes: [AUTH_CONFIG.apiScope], // Only request API scope - openid/profile/email are automatic
+      scopes: [AUTH_CONFIG.apiScope],
       prompt: "select_account",
     };
 
@@ -88,23 +88,68 @@ async function signIn() {
           account: accounts[0],
         });
         currentAccount = silentResult.account;
+        console.log("[Auth] Silent sign-in successful");
         return silentResult.accessToken;
       } catch (silentErr) {
-        // Falls through to popup
-        console.warn("[Auth] Silent token acquisition failed, trying popup", silentErr);
+        console.warn("[Auth] Silent token acquisition failed, opening dialog", silentErr);
       }
     }
 
-    // Popup sign-in (only one at a time)
-    const popupResult = await msalInstance.loginPopup(tokenRequest);
-    currentAccount = popupResult.account;
+    // Use Office Dialog API for authentication
+    console.log("[Auth] Opening Office Dialog for authentication...");
+    const dialogUrl = window.location.origin + "/auth-dialog.html";
 
-    // Immediately acquire the token after login
-    const tokenResult = await msalInstance.acquireTokenSilent({
-      ...tokenRequest,
-      account: currentAccount,
+    return new Promise((resolve, reject) => {
+      Office.context.ui.displayDialogAsync(
+        dialogUrl,
+        { height: 60, width: 30, promptBeforeOpen: false },
+        (result) => {
+          if (result.status === Office.AsyncResultStatus.Failed) {
+            console.error("[Auth] Dialog failed to open:", result.error);
+            reject(new Error("Failed to open authentication dialog: " + result.error.message));
+            return;
+          }
+
+          const dialog = result.value;
+          console.log("[Auth] Dialog opened successfully");
+
+          // Listen for messages from the dialog
+          dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
+            dialog.close();
+
+            try {
+              const response = JSON.parse(arg.message);
+              console.log("[Auth] Received message from dialog:", response.status);
+
+              if (response.status === "success") {
+                // Store account info for future silent auth
+                currentAccount = {
+                  username: response.account.username,
+                  name: response.account.name,
+                };
+                console.log("[Auth] Sign-in successful:", currentAccount.username);
+                resolve(response.token);
+              } else {
+                console.error("[Auth] Sign-in failed:", response.error);
+                reject(new Error(response.error || "Authentication failed"));
+              }
+            } catch (err) {
+              console.error("[Auth] Failed to parse dialog message:", err);
+              reject(new Error("Failed to process authentication response"));
+            }
+          });
+
+          // Handle dialog closed by user
+          dialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
+            console.log("[Auth] Dialog event:", arg.type);
+            if (arg.type === Office.EventType.DialogEventReceived) {
+              dialog.close();
+              reject(new Error("Authentication cancelled"));
+            }
+          });
+        }
+      );
     });
-    return tokenResult.accessToken;
   });
 }
 

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f5f5f5;
+    }
+    .container {
+      text-align: center;
+      padding: 40px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 400px;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      margin: 20px auto;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #4472C4;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .error {
+      color: #d32f2f;
+      margin-top: 20px;
+      padding: 12px;
+      background: #ffebee;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Signing in...</h2>
+    <div class="spinner"></div>
+    <p id="status">Authenticating with Microsoft</p>
+    <div id="error" class="error" style="display: none;"></div>
+  </div>
+
+  <script>
+    const AUTH_CONFIG = {
+      clientId: "19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c",
+      tenantId: "dbd0413f-9515-4bd1-945a-1948b655558b",
+      redirectUri: window.location.origin + "/auth-dialog.html",
+      apiScope: "api://19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c/Icons.Read",
+    };
+
+    const msalConfig = {
+      auth: {
+        clientId: AUTH_CONFIG.clientId,
+        authority: `https://login.microsoftonline.com/${AUTH_CONFIG.tenantId}`,
+        redirectUri: AUTH_CONFIG.redirectUri,
+      },
+      cache: {
+        cacheLocation: "sessionStorage",
+        storeAuthStateInCookie: true,
+      },
+    };
+
+    let msalInstance = null;
+
+    function updateStatus(msg) {
+      document.getElementById('status').textContent = msg;
+      console.log("[Auth Dialog]", msg);
+    }
+
+    function showError(msg) {
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+      document.querySelector('.spinner').style.display = 'none';
+    }
+
+    async function authenticate() {
+      try {
+        updateStatus("Initializing authentication...");
+        msalInstance = new msal.PublicClientApplication(msalConfig);
+        await msalInstance.initialize();
+
+        updateStatus("Opening sign-in...");
+
+        const tokenRequest = {
+          scopes: [AUTH_CONFIG.apiScope],
+          prompt: "select_account",
+        };
+
+        // Try popup authentication
+        const popupResult = await msalInstance.loginPopup(tokenRequest);
+        updateStatus("Getting access token...");
+
+        // Get the token
+        const tokenResult = await msalInstance.acquireTokenSilent({
+          scopes: [AUTH_CONFIG.apiScope],
+          account: popupResult.account,
+        });
+
+        updateStatus("Sign-in successful!");
+
+        // Send token back to taskpane via Office Dialog API
+        if (Office && Office.context && Office.context.ui) {
+          Office.context.ui.messageParent(JSON.stringify({
+            status: "success",
+            token: tokenResult.accessToken,
+            account: {
+              username: popupResult.account.username,
+              name: popupResult.account.name,
+            }
+          }));
+        } else {
+          throw new Error("Office.context.ui not available");
+        }
+
+      } catch (error) {
+        console.error("[Auth Dialog] Error:", error);
+        showError(error.message || "Authentication failed");
+
+        // Send error back to taskpane
+        if (Office && Office.context && Office.context.ui) {
+          Office.context.ui.messageParent(JSON.stringify({
+            status: "error",
+            error: error.message || "Authentication failed"
+          }));
+        }
+      }
+    }
+
+    // Start authentication when Office.js is ready
+    Office.onReady(() => {
+      console.log("[Auth Dialog] Office.js ready, starting authentication");
+      authenticate();
+    });
+  </script>
+</body>
+</html>
