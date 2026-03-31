@@ -88,64 +88,95 @@
       document.querySelector('.spinner').style.display = 'none';
     }
 
-    async function authenticate() {
+    async function handleRedirectResponse() {
       try {
-        updateStatus("Initializing authentication...");
+        updateStatus("Processing authentication...");
+
         msalInstance = new msal.PublicClientApplication(msalConfig);
         await msalInstance.initialize();
 
-        updateStatus("Opening sign-in...");
+        // Handle redirect response
+        const response = await msalInstance.handleRedirectPromise();
 
-        const tokenRequest = {
-          scopes: [AUTH_CONFIG.apiScope],
-          prompt: "select_account",
-        };
+        if (response) {
+          // Successfully authenticated via redirect
+          updateStatus("Getting access token...");
+          console.log("[Auth Dialog] Login successful, getting token");
 
-        // Try popup authentication
-        const popupResult = await msalInstance.loginPopup(tokenRequest);
-        updateStatus("Getting access token...");
+          const tokenResult = await msalInstance.acquireTokenSilent({
+            scopes: [AUTH_CONFIG.apiScope],
+            account: response.account,
+          });
 
-        // Get the token
-        const tokenResult = await msalInstance.acquireTokenSilent({
-          scopes: [AUTH_CONFIG.apiScope],
-          account: popupResult.account,
-        });
+          updateStatus("Sign-in successful!");
 
-        updateStatus("Sign-in successful!");
-
-        // Send token back to taskpane via Office Dialog API
-        if (Office && Office.context && Office.context.ui) {
-          Office.context.ui.messageParent(JSON.stringify({
+          // Send token back to taskpane
+          const message = JSON.stringify({
             status: "success",
             token: tokenResult.accessToken,
             account: {
-              username: popupResult.account.username,
-              name: popupResult.account.name,
+              username: response.account.username,
+              name: response.account.name,
             }
-          }));
+          });
+
+          console.log("[Auth Dialog] Sending success message to parent");
+
+          // Use messageParent to send to taskpane
+          if (window.opener && window.opener.Office) {
+            // For popup mode
+            window.opener.postMessage(message, window.location.origin);
+            window.close();
+          } else if (Office && Office.context && Office.context.ui) {
+            // For Office Dialog
+            Office.context.ui.messageParent(message);
+          } else {
+            // Fallback
+            window.parent.postMessage(message, "*");
+          }
+
         } else {
-          throw new Error("Office.context.ui not available");
+          // No response - need to initiate login
+          console.log("[Auth Dialog] No redirect response, starting login redirect");
+          updateStatus("Redirecting to sign-in...");
+
+          await msalInstance.loginRedirect({
+            scopes: [AUTH_CONFIG.apiScope],
+            prompt: "select_account",
+          });
         }
 
       } catch (error) {
         console.error("[Auth Dialog] Error:", error);
         showError(error.message || "Authentication failed");
 
-        // Send error back to taskpane
-        if (Office && Office.context && Office.context.ui) {
-          Office.context.ui.messageParent(JSON.stringify({
-            status: "error",
-            error: error.message || "Authentication failed"
-          }));
+        const message = JSON.stringify({
+          status: "error",
+          error: error.message || "Authentication failed"
+        });
+
+        // Try all methods to send error
+        try {
+          if (window.opener) {
+            window.opener.postMessage(message, window.location.origin);
+            window.close();
+          } else if (Office && Office.context && Office.context.ui) {
+            Office.context.ui.messageParent(message);
+          } else {
+            window.parent.postMessage(message, "*");
+          }
+        } catch (sendError) {
+          console.error("[Auth Dialog] Failed to send error:", sendError);
         }
       }
     }
 
-    // Start authentication when Office.js is ready
-    Office.onReady(() => {
-      console.log("[Auth Dialog] Office.js ready, starting authentication");
-      authenticate();
-    });
+    // Start authentication when page loads
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", handleRedirectResponse);
+    } else {
+      handleRedirectResponse();
+    }
   </script>
 </body>
 </html>

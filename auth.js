@@ -100,11 +100,41 @@ async function signIn() {
     const dialogUrl = window.location.origin + "/auth-dialog.html";
 
     return new Promise((resolve, reject) => {
+      let dialogClosed = false;
+
+      // Also listen for postMessage as fallback
+      const messageHandler = (event) => {
+        if (event.origin !== window.location.origin) return;
+
+        try {
+          const response = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+          if (response.status === "success") {
+            window.removeEventListener("message", messageHandler);
+            currentAccount = {
+              username: response.account.username,
+              name: response.account.name,
+            };
+            console.log("[Auth] Sign-in successful via postMessage:", currentAccount.username);
+            resolve(response.token);
+          } else if (response.status === "error") {
+            window.removeEventListener("message", messageHandler);
+            console.error("[Auth] Sign-in failed via postMessage:", response.error);
+            reject(new Error(response.error || "Authentication failed"));
+          }
+        } catch (err) {
+          console.error("[Auth] Failed to parse postMessage:", err);
+        }
+      };
+
+      window.addEventListener("message", messageHandler);
+
       Office.context.ui.displayDialogAsync(
         dialogUrl,
-        { height: 60, width: 30, promptBeforeOpen: false },
+        { height: 70, width: 40, promptBeforeOpen: false },
         (result) => {
           if (result.status === Office.AsyncResultStatus.Failed) {
+            window.removeEventListener("message", messageHandler);
             console.error("[Auth] Dialog failed to open:", result.error);
             reject(new Error("Failed to open authentication dialog: " + result.error.message));
             return;
@@ -115,14 +145,16 @@ async function signIn() {
 
           // Listen for messages from the dialog
           dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
+            if (dialogClosed) return;
+            dialogClosed = true;
             dialog.close();
+            window.removeEventListener("message", messageHandler);
 
             try {
               const response = JSON.parse(arg.message);
               console.log("[Auth] Received message from dialog:", response.status);
 
               if (response.status === "success") {
-                // Store account info for future silent auth
                 currentAccount = {
                   username: response.account.username,
                   name: response.account.name,
@@ -141,11 +173,11 @@ async function signIn() {
 
           // Handle dialog closed by user
           dialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
-            console.log("[Auth] Dialog event:", arg.type);
-            if (arg.type === Office.EventType.DialogEventReceived) {
-              dialog.close();
-              reject(new Error("Authentication cancelled"));
-            }
+            if (dialogClosed) return;
+            console.log("[Auth] Dialog event:", arg.error);
+            dialogClosed = true;
+            window.removeEventListener("message", messageHandler);
+            reject(new Error("Authentication cancelled by user"));
           });
         }
       );
