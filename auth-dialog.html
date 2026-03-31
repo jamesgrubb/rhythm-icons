@@ -52,6 +52,8 @@
     <div class="spinner"></div>
     <p id="status">Authenticating with Microsoft</p>
     <div id="error" class="error" style="display: none;"></div>
+    <div id="debug" style="margin-top: 20px; font-size: 12px; color: #666; text-align: left; max-height: 200px; overflow-y: auto;"></div>
+    <button id="close-btn" style="display: none; margin-top: 20px; padding: 10px 20px; background: #4472C4; color: white; border: none; border-radius: 4px; cursor: pointer;">Close Window</button>
   </div>
 
   <script>
@@ -76,9 +78,17 @@
 
     let msalInstance = null;
 
+    function addDebugLog(msg) {
+      const debugEl = document.getElementById('debug');
+      const time = new Date().toLocaleTimeString();
+      debugEl.innerHTML += `<div>[${time}] ${msg}</div>`;
+      debugEl.scrollTop = debugEl.scrollHeight;
+      console.log("[Auth Dialog]", msg);
+    }
+
     function updateStatus(msg) {
       document.getElementById('status').textContent = msg;
-      console.log("[Auth Dialog]", msg);
+      addDebugLog(msg);
     }
 
     function showError(msg) {
@@ -86,6 +96,19 @@
       errorEl.textContent = msg;
       errorEl.style.display = 'block';
       document.querySelector('.spinner').style.display = 'none';
+      addDebugLog('ERROR: ' + msg);
+
+      // Show manual close button on error
+      document.getElementById('close-btn').style.display = 'block';
+    }
+
+    function showCloseButton() {
+      document.querySelector('.spinner').style.display = 'none';
+      document.getElementById('close-btn').style.display = 'block';
+      document.getElementById('close-btn').onclick = () => {
+        addDebugLog('Manual close button clicked');
+        window.close();
+      };
     }
 
     let officeReady = false;
@@ -99,48 +122,83 @@
     async function sendMessageToParent(message) {
       const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
 
-      console.log("[Auth Dialog] Attempting to send message to parent");
+      addDebugLog("Attempting to send message to parent");
 
       // Wait for Office.js to be ready
       let attempts = 0;
       while (!officeReady && attempts < 50) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
+        if (attempts % 10 === 0) {
+          addDebugLog(`Waiting for Office.js... (${attempts * 100}ms)`);
+        }
       }
 
       if (!officeReady) {
-        console.warn("[Auth Dialog] Office.js not ready after 5 seconds, trying anyway");
+        addDebugLog("WARNING: Office.js not ready after 5 seconds, trying anyway");
+      } else {
+        addDebugLog("Office.js is ready");
       }
+
+      let messageSent = false;
 
       // Try Office Dialog messageParent (most reliable)
       try {
         if (Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
-          console.log("[Auth Dialog] Sending via Office.context.ui.messageParent");
+          addDebugLog("Sending via Office.context.ui.messageParent");
           Office.context.ui.messageParent(messageStr);
+          messageSent = true;
+          addDebugLog("✓ Message sent successfully");
+
+          // Show close button after sending
+          setTimeout(() => {
+            addDebugLog("Dialog should have closed. Showing manual close button.");
+            showCloseButton();
+          }, 2000);
           return;
+        } else {
+          addDebugLog("Office.context.ui.messageParent not available");
         }
       } catch (err) {
-        console.error("[Auth Dialog] messageParent failed:", err);
+        addDebugLog("messageParent failed: " + err.message);
       }
 
       // Fallback: postMessage to opener
       try {
         if (window.opener) {
-          console.log("[Auth Dialog] Sending via window.opener.postMessage");
+          addDebugLog("Sending via window.opener.postMessage");
           window.opener.postMessage(messageStr, window.location.origin);
-          setTimeout(() => window.close(), 500);
+          messageSent = true;
+          addDebugLog("✓ Message sent to opener");
+          setTimeout(() => {
+            addDebugLog("Closing window...");
+            window.close();
+          }, 500);
           return;
         }
       } catch (err) {
-        console.error("[Auth Dialog] opener.postMessage failed:", err);
+        addDebugLog("opener.postMessage failed: " + err.message);
       }
 
       // Last resort: postMessage to parent
       try {
-        console.log("[Auth Dialog] Sending via window.parent.postMessage");
+        addDebugLog("Sending via window.parent.postMessage");
         window.parent.postMessage(messageStr, window.location.origin);
+        messageSent = true;
+        addDebugLog("✓ Message sent to parent");
       } catch (err) {
-        console.error("[Auth Dialog] parent.postMessage failed:", err);
+        addDebugLog("parent.postMessage failed: " + err.message);
+      }
+
+      if (!messageSent) {
+        addDebugLog("❌ Failed to send message via any method");
+        showError("Could not communicate with add-in. Please close this window manually.");
+      } else {
+        // Show manual close button as backup
+        setTimeout(() => {
+          addDebugLog("If window didn't close automatically, click button below");
+          showCloseButton();
+        }, 3000);
       }
     }
 
