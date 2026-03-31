@@ -88,6 +88,62 @@
       document.querySelector('.spinner').style.display = 'none';
     }
 
+    let officeReady = false;
+
+    // Initialize Office.js first
+    Office.onReady(() => {
+      console.log("[Auth Dialog] Office.js is ready");
+      officeReady = true;
+    });
+
+    async function sendMessageToParent(message) {
+      const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+
+      console.log("[Auth Dialog] Attempting to send message to parent");
+
+      // Wait for Office.js to be ready
+      let attempts = 0;
+      while (!officeReady && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+
+      if (!officeReady) {
+        console.warn("[Auth Dialog] Office.js not ready after 5 seconds, trying anyway");
+      }
+
+      // Try Office Dialog messageParent (most reliable)
+      try {
+        if (Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+          console.log("[Auth Dialog] Sending via Office.context.ui.messageParent");
+          Office.context.ui.messageParent(messageStr);
+          return;
+        }
+      } catch (err) {
+        console.error("[Auth Dialog] messageParent failed:", err);
+      }
+
+      // Fallback: postMessage to opener
+      try {
+        if (window.opener) {
+          console.log("[Auth Dialog] Sending via window.opener.postMessage");
+          window.opener.postMessage(messageStr, window.location.origin);
+          setTimeout(() => window.close(), 500);
+          return;
+        }
+      } catch (err) {
+        console.error("[Auth Dialog] opener.postMessage failed:", err);
+      }
+
+      // Last resort: postMessage to parent
+      try {
+        console.log("[Auth Dialog] Sending via window.parent.postMessage");
+        window.parent.postMessage(messageStr, window.location.origin);
+      } catch (err) {
+        console.error("[Auth Dialog] parent.postMessage failed:", err);
+      }
+    }
+
     async function handleRedirectResponse() {
       try {
         updateStatus("Processing authentication...");
@@ -111,29 +167,17 @@
           updateStatus("Sign-in successful!");
 
           // Send token back to taskpane
-          const message = JSON.stringify({
+          const message = {
             status: "success",
             token: tokenResult.accessToken,
             account: {
               username: response.account.username,
               name: response.account.name,
             }
-          });
+          };
 
           console.log("[Auth Dialog] Sending success message to parent");
-
-          // Use messageParent to send to taskpane
-          if (window.opener && window.opener.Office) {
-            // For popup mode
-            window.opener.postMessage(message, window.location.origin);
-            window.close();
-          } else if (Office && Office.context && Office.context.ui) {
-            // For Office Dialog
-            Office.context.ui.messageParent(message);
-          } else {
-            // Fallback
-            window.parent.postMessage(message, "*");
-          }
+          await sendMessageToParent(message);
 
         } else {
           // No response - need to initiate login
@@ -150,24 +194,12 @@
         console.error("[Auth Dialog] Error:", error);
         showError(error.message || "Authentication failed");
 
-        const message = JSON.stringify({
+        const message = {
           status: "error",
           error: error.message || "Authentication failed"
-        });
+        };
 
-        // Try all methods to send error
-        try {
-          if (window.opener) {
-            window.opener.postMessage(message, window.location.origin);
-            window.close();
-          } else if (Office && Office.context && Office.context.ui) {
-            Office.context.ui.messageParent(message);
-          } else {
-            window.parent.postMessage(message, "*");
-          }
-        } catch (sendError) {
-          console.error("[Auth Dialog] Failed to send error:", sendError);
-        }
+        await sendMessageToParent(message);
       }
     }
 
