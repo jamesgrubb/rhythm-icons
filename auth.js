@@ -42,10 +42,24 @@ let interactionPromise = null;
 
 /**
  * Initialise MSAL. Called once Office.js is ready.
+ * Only initializes once globally to preserve session across multiple calls.
  */
-function initMsal() {
+async function initMsal() {
+  // Only initialize once globally
+  if (window.__MSAL_INSTANCE__) {
+    console.log("[Auth] Using existing MSAL instance");
+    msalInstance = window.__MSAL_INSTANCE__;
+    return;
+  }
+
+  console.log("[Auth] Creating new MSAL instance");
   msalInstance = new msal.PublicClientApplication(msalConfig);
-  return msalInstance.initialize();
+  await msalInstance.initialize();
+
+  // Store globally so all bootstrap calls use the same instance
+  window.__MSAL_INSTANCE__ = msalInstance;
+
+  console.log("[Auth] MSAL instance initialized and stored globally");
 }
 
 /**
@@ -270,17 +284,27 @@ function getCurrentAccount() {
  * Returns an access token if yes, null if not.
  */
 async function tryRestoreSession() {
-  if (!msalInstance) return null;
+  if (!msalInstance) {
+    console.log("[Auth] tryRestoreSession: No MSAL instance");
+    return null;
+  }
+
   const accounts = msalInstance.getAllAccounts();
+  console.log("[Auth] tryRestoreSession: Found", accounts.length, "account(s)");
+
   if (accounts.length === 0) return null;
+
   try {
+    console.log("[Auth] tryRestoreSession: Attempting silent token acquisition");
     const result = await msalInstance.acquireTokenSilent({
       scopes: [AUTH_CONFIG.apiScope],
       account: accounts[0],
     });
     currentAccount = result.account;
+    console.log("[Auth] tryRestoreSession: Success! Restored session for", currentAccount.username);
     return result.accessToken;
-  } catch {
+  } catch (err) {
+    console.log("[Auth] tryRestoreSession: Failed -", err.message);
     return null;
   }
 }
