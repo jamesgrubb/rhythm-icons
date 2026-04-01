@@ -95,6 +95,22 @@ Office.onReady(async ({ host }) => {
 
   // ---- Render ----
   function renderTabs(categories) {
+    // Remove existing tenant header if any
+    const existingHeader = document.querySelector('.tenant-header');
+    if (existingHeader) existingHeader.remove();
+
+    // Add tenant header above tabs
+    if (currentUserProfile) {
+      const tenantHeader = document.createElement('div');
+      tenantHeader.className = 'tenant-header';
+      tenantHeader.innerHTML = `
+        <strong>${currentUserProfile.tenant.name}</strong>
+        <span style="opacity: 0.7;">${allIcons.length} icon${allIcons.length !== 1 ? 's' : ''}</span>
+      `;
+      categoryTabs.before(tenantHeader);
+    }
+
+    // Render category tabs
     categoryTabs.innerHTML = "";
     categories.forEach(cat => {
       const btn = document.createElement("button");

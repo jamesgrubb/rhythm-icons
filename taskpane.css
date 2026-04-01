@@ -233,6 +233,22 @@ header {
 #search-input::placeholder { color: var(--text-3); }
 
 /* ---- TABS ---- */
+/* ---- TENANT HEADER ---- */
+.tenant-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.tenant-header strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
 .tabs {
   display: flex;
   gap: 2px;
