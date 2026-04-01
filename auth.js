@@ -117,7 +117,7 @@ async function signIn() {
       let dialogClosed = false;
 
       // Also listen for postMessage as fallback
-      const messageHandler = (event) => {
+      const messageHandler = async (event) => {
         if (event.origin !== window.location.origin) return;
 
         try {
@@ -125,11 +125,27 @@ async function signIn() {
 
           if (response.status === "success") {
             window.removeEventListener("message", messageHandler);
-            currentAccount = {
-              username: response.account.username,
-              name: response.account.name,
-            };
-            console.log("[Auth] Sign-in successful via postMessage:", currentAccount.username);
+            console.log("[Auth] Sign-in successful via postMessage:", response.account.username);
+
+            // Reinitialize MSAL to pick up the cached account from localStorage
+            console.log("[Auth] Reinitializing MSAL to load cached account...");
+            msalInstance = new msal.PublicClientApplication(msalConfig);
+            await msalInstance.initialize();
+            window.__MSAL_INSTANCE__ = msalInstance;
+
+            // Now get the account from the reinitialized instance
+            const accounts = msalInstance.getAllAccounts();
+            console.log("[Auth] After reinit, found", accounts.length, "account(s)");
+            if (accounts.length > 0) {
+              currentAccount = accounts[0];
+            } else {
+              // Fallback to the account info from dialog
+              currentAccount = {
+                username: response.account.username,
+                name: response.account.name,
+              };
+            }
+
             resolve(response.token);
           } else if (response.status === "error") {
             window.removeEventListener("message", messageHandler);
@@ -159,7 +175,7 @@ async function signIn() {
           console.log("[Auth] Dialog has addEventHandler?", typeof dialog.addEventHandler);
 
           // Listen for messages from the dialog
-          const messageReceivedHandler = (arg) => {
+          const messageReceivedHandler = async (arg) => {
             console.log("[Auth] *** DialogMessageReceived event fired! ***", arg);
 
             if (dialogClosed) {
@@ -185,11 +201,28 @@ async function signIn() {
               console.log("[Auth] Received message from dialog:", response.status);
 
               if (response.status === "success") {
-                currentAccount = {
-                  username: response.account.username,
-                  name: response.account.name,
-                };
-                console.log("[Auth] Sign-in successful:", currentAccount.username);
+                console.log("[Auth] Sign-in successful:", response.account.username);
+
+                // Reinitialize MSAL to pick up the cached account from localStorage
+                // (the dialog wrote it, but our in-memory instance doesn't know about it yet)
+                console.log("[Auth] Reinitializing MSAL to load cached account...");
+                msalInstance = new msal.PublicClientApplication(msalConfig);
+                await msalInstance.initialize();
+                window.__MSAL_INSTANCE__ = msalInstance;
+
+                // Now get the account from the reinitialized instance
+                const accounts = msalInstance.getAllAccounts();
+                console.log("[Auth] After reinit, found", accounts.length, "account(s)");
+                if (accounts.length > 0) {
+                  currentAccount = accounts[0];
+                } else {
+                  // Fallback to the account info from dialog
+                  currentAccount = {
+                    username: response.account.username,
+                    name: response.account.name,
+                  };
+                }
+
                 resolve(response.token);
               } else {
                 console.error("[Auth] Sign-in failed:", response.error);
