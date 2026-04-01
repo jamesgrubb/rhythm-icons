@@ -65,6 +65,11 @@ html, body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Hide debug status box in production */
+#debug-status {
+  display: none;
+}
+
 /* ---- AUTH SCREEN ---- */
 #auth-screen {
   align-items: center;

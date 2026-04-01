@@ -567,13 +567,18 @@ Office.onReady(async ({ host }) => {
 
     // Production auth flow
     try {
+      updateDebugStatus("Initializing MSAL...");
       await initMsal();
+      updateDebugStatus("Checking for cached session...");
       const token = await tryRestoreSession();
       if (token) {
+        updateDebugStatus("Session restored! Loading icons...");
         try {
           await loadIcons(token);
+          updateDebugStatus("Icons loaded, showing main screen");
           showScreen("main");
         } catch (loadErr) {
+          updateDebugStatus(`Load error: ${loadErr.message}`);
           if (loadErr.status === 401) {
             clearCurrentSession();
             console.warn("[Bootstrap] Token rejected (401), showing sign-in");
@@ -581,10 +586,12 @@ Office.onReady(async ({ host }) => {
           showScreen("auth");
         }
       } else {
+        updateDebugStatus("No cached session, showing sign-in");
         showScreen("auth");
       }
     } catch (err) {
       console.error("[Bootstrap] Error:", err);
+      updateDebugStatus(`Bootstrap error: ${err.message}`);
       showScreen("auth");
     }
   }
