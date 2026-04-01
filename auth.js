@@ -346,5 +346,6 @@ async function tryRestoreSession() {
 window.initMsal = initMsal;
 window.signIn = signIn;
 window.signOut = signOut;
+window.getAccessToken = getAccessToken;
 window.tryRestoreSession = tryRestoreSession;
 window.clearCurrentSession = clearCurrentSession;
