@@ -661,6 +661,10 @@ Office.onReady(async ({ host }) => {
           currentUserRole = currentUserProfile.role;
           console.log('[Profile] User role:', currentUserRole, 'Tenant:', currentUserProfile.tenant.name);
           updateUIForRole();
+
+          // Expose for debugging
+          window.__DEBUG_PROFILE = currentUserProfile;
+          window.__DEBUG_ROLE = currentUserRole;
         }
       } catch (err) {
         console.warn('[Profile] Failed to fetch user profile:', err);
@@ -673,6 +677,9 @@ Office.onReady(async ({ host }) => {
     const categories = getCategories(allIcons);
     renderTabs(categories);
     renderGrid();
+
+    // Expose for debugging
+    window.__DEBUG_ICONS = allIcons;
   }
 
   // ---- Bootstrap ----
