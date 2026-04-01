@@ -15,16 +15,19 @@ function updateDebugStatus(msg) {
 
 updateDebugStatus("Script loaded");
 
-let bootstrapped = false; // Prevent double initialization
+// Global guard to prevent any duplicate initialization across all script loads
+if (!window.__RHYTHM_ICONS_INITIALIZED__) {
+  window.__RHYTHM_ICONS_INITIALIZED__ = true;
 
 Office.onReady(async ({ host }) => {
   updateDebugStatus(`Office.onReady fired! Host: ${host}`);
 
-  if (bootstrapped) {
+  // Additional check in case Office.onReady fires multiple times
+  if (window.__RHYTHM_ICONS_BOOTSTRAPPED__) {
     updateDebugStatus("Already bootstrapped, skipping duplicate Office.onReady");
     return;
   }
-  bootstrapped = true;
+  window.__RHYTHM_ICONS_BOOTSTRAPPED__ = true;
 
   const currentHost = host; // Office.HostType.Word | Office.HostType.PowerPoint
 
@@ -814,3 +817,7 @@ Office.onReady(async ({ host }) => {
 
   await bootstrap();
 });
+
+} else {
+  updateDebugStatus("Script already initialized, skipping duplicate load");
+}
