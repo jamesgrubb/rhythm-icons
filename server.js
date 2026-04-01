@@ -210,9 +210,20 @@ async function extractUserRole(req, res, next) {
       req.user.dbRole = roleFromAzure;
       req.user.userId = null; // Will be set on next request
     } else {
-      req.user.dbRole = userResult.rows[0].role;
+      // User exists - sync role from Azure AD (Azure AD is source of truth)
+      const dbRole = userResult.rows[0].role;
       req.user.userId = userResult.rows[0].id;
-      console.log('[Role] User found:', email, 'with role:', req.user.dbRole);
+
+      if (dbRole !== roleFromAzure) {
+        console.log('[Role] Syncing role for', email, 'from DB:', dbRole, 'to Azure AD:', roleFromAzure);
+        await pool.query(
+          'UPDATE users SET role = $1 WHERE azure_user_id = $2',
+          [roleFromAzure, azureUserId]
+        );
+      }
+
+      req.user.dbRole = roleFromAzure; // Always use Azure AD role as source of truth
+      console.log('[Role] User authenticated:', email, 'with role:', req.user.dbRole);
     }
 
     req.user.tenantId = tenantId;
