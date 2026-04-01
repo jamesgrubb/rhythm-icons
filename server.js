@@ -21,19 +21,24 @@ const PORT = process.env.PORT || 3001;
 const AZURE_TENANT_ID = process.env.AZURE_TENANT_ID || "dbd0413f-9515-4bd1-945a-1948b655558b";
 const AZURE_CLIENT_ID = process.env.AZURE_CLIENT_ID || "19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c";
 
-// Azure may send aud as client ID, Application ID URI, or array; accept common issuer formats
+// Azure may send aud as client ID, Application ID URI, or array
 const JWT_AUDIENCE = [AZURE_CLIENT_ID, `api://${AZURE_CLIENT_ID}`];
-const JWT_ISSUERS = [
-  `https://login.microsoftonline.com/${AZURE_TENANT_ID}/v2.0`,
-  `https://login.microsoftonline.com/${AZURE_TENANT_ID}/`,
-  `https://sts.windows.net/${AZURE_TENANT_ID}/`,
-];
 
-const JWKS_URI = `https://login.microsoftonline.com/${AZURE_TENANT_ID}/discovery/v2.0/keys`;
+// Multi-tenant: We'll validate issuer format dynamically based on token's tid claim
+// Accept issuers from any Azure AD tenant
+const jwksClients = {}; // Cache JWKS clients per tenant
 
-const client = jwksClient({ jwksUri: JWKS_URI, cache: true, rateLimit: true });
+// Dynamic JWKS client per tenant
+function getJwksClient(tenantId) {
+  if (!jwksClients[tenantId]) {
+    const jwksUri = `https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`;
+    jwksClients[tenantId] = jwksClient({ jwksUri, cache: true, rateLimit: true });
+  }
+  return jwksClients[tenantId];
+}
 
-function getSigningKey(header, callback) {
+function getSigningKey(tenantId, header, callback) {
+  const client = getJwksClient(tenantId);
   client.getSigningKey(header.kid, (err, key) => {
     if (err) return callback(err);
     callback(null, key.getPublicKey());
@@ -84,18 +89,32 @@ function requireAuth(req, res, next) {
     return next();
   }
 
+  // Multi-tenant: Extract tenant ID from token
+  const tenantId = decoded?.tid;
+  if (!tenantId) {
+    console.error("[Auth] No tenant ID (tid) in token");
+    return send401(res, "No tenant ID in token", decoded);
+  }
+
+  // Validate issuer format (accept any Azure AD tenant)
+  const validIssuerFormats = [
+    `https://login.microsoftonline.com/${tenantId}/v2.0`,
+    `https://login.microsoftonline.com/${tenantId}/`,
+    `https://sts.windows.net/${tenantId}/`,
+  ];
+
   jwt.verify(
     token,
-    getSigningKey,
+    (header, callback) => getSigningKey(tenantId, header, callback),
     {
       audience: JWT_AUDIENCE,
-      issuer: JWT_ISSUERS,
+      issuer: validIssuerFormats,
       algorithms: ["RS256"],
     },
     (err, decodedVerified) => {
       if (err) {
         console.error("[Auth] JWT verify failed:", err.message);
-        if (decoded) console.error("[Auth] Token aud:", decoded.aud, "| iss:", decoded.iss);
+        if (decoded) console.error("[Auth] Token aud:", decoded.aud, "| iss:", decoded.iss, "| tid:", decoded.tid);
         return send401(res, err.message, decoded);
       }
       // Audience already validated by jwt.verify, but double-check with custom logic
@@ -142,6 +161,86 @@ async function ensureTenantExists(req, res, next) {
     // Fallback to default tenant will happen in getTenantId()
     next();
   }
+}
+
+// ---- Role Extraction Middleware ----
+async function extractUserRole(req, res, next) {
+  const azureUserId = req.user.oid; // Azure AD Object ID (unique user identifier)
+  const azureTenantId = req.user.tid; // Azure AD Tenant ID
+  const email = req.user.email || req.user.preferred_username || req.user.unique_name;
+  const name = req.user.name || email;
+
+  // Extract app roles from JWT (assigned via Azure AD)
+  const appRoles = req.user.roles || [];
+  console.log('[Role] User roles from Azure AD:', appRoles);
+
+  // Determine role: admin > viewer > user (default)
+  const roleFromAzure = appRoles.includes('admin') ? 'admin'
+                      : appRoles.includes('viewer') ? 'viewer'
+                      : 'user';
+
+  try {
+    // Get tenant ID from database
+    const tenantResult = await pool.query(
+      'SELECT id FROM tenants WHERE azure_tenant_id = $1',
+      [azureTenantId]
+    );
+
+    if (tenantResult.rows.length === 0) {
+      console.error('[Role] Tenant not found:', azureTenantId);
+      return res.status(403).json({ error: 'Tenant not provisioned' });
+    }
+
+    const tenantId = tenantResult.rows[0].id;
+
+    // Look up or auto-provision user
+    let userResult = await pool.query(
+      'SELECT role, id FROM users WHERE azure_user_id = $1',
+      [azureUserId]
+    );
+
+    if (userResult.rows.length === 0) {
+      // Auto-provision user with role from Azure AD
+      console.log('[Role] Auto-provisioning user:', email, 'with role:', roleFromAzure);
+      await pool.query(
+        `INSERT INTO users (tenant_id, azure_user_id, email, name, role, created_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())`,
+        [tenantId, azureUserId, email, name, roleFromAzure]
+      );
+      req.user.dbRole = roleFromAzure;
+      req.user.userId = null; // Will be set on next request
+    } else {
+      req.user.dbRole = userResult.rows[0].role;
+      req.user.userId = userResult.rows[0].id;
+      console.log('[Role] User found:', email, 'with role:', req.user.dbRole);
+    }
+
+    req.user.tenantId = tenantId;
+    next();
+  } catch (error) {
+    console.error('[Role] Error extracting user role:', error);
+    res.status(500).json({ error: 'Failed to determine user permissions' });
+  }
+}
+
+// ---- Authorization Middleware ----
+function requireRole(...allowedRoles) {
+  return (req, res, next) => {
+    if (!req.user.dbRole) {
+      return res.status(403).json({ error: 'No role assigned' });
+    }
+
+    if (!allowedRoles.includes(req.user.dbRole)) {
+      console.warn(`[Auth] Access denied: user role '${req.user.dbRole}' not in allowed roles:`, allowedRoles);
+      return res.status(403).json({
+        error: 'Insufficient permissions',
+        required: allowedRoles,
+        current: req.user.dbRole
+      });
+    }
+
+    next();
+  };
 }
 
 // ---- Middleware ----
@@ -225,21 +324,23 @@ async function getTenantId(user) {
 // ---- Icons API ----
 
 // GET /api/icons — returns icon list filtered by tenant
-app.get("/api/icons", requireAuth, ensureTenantExists, async (req, res) => {
-  console.log("[API] GET /api/icons — auth OK, user:", req.user?.sub ?? req.user?.oid);
+app.get("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin', 'user', 'viewer'), async (req, res) => {
+  console.log("[API] GET /api/icons — auth OK, user:", req.user?.sub ?? req.user?.oid, "role:", req.user.dbRole);
   try {
-    const tenantId = await getTenantId(req.user);
+    const tenantId = req.user.tenantId;
 
     if (!tenantId) {
       return res.status(403).json({ error: "No tenant found for user" });
     }
 
-    // Fetch icons for this tenant OR public icons
+    // Fetch icons for this tenant OR public icons, include tenant name
     const result = await pool.query(
-      `SELECT icon_id as id, name, category, svg
-       FROM icons
-       WHERE tenant_id = $1 OR is_public = true
-       ORDER BY category, name`,
+      `SELECT i.icon_id as id, i.name, i.category, i.svg, i.is_public,
+              t.name as tenant_name
+       FROM icons i
+       LEFT JOIN tenants t ON i.tenant_id = t.id
+       WHERE i.tenant_id = $1 OR i.is_public = true
+       ORDER BY i.category, i.name`,
       [tenantId]
     );
 
@@ -251,9 +352,9 @@ app.get("/api/icons", requireAuth, ensureTenantExists, async (req, res) => {
 });
 
 // GET /api/icons/:id — fetch a single icon
-app.get("/api/icons/:id", requireAuth, ensureTenantExists, async (req, res) => {
+app.get("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin', 'user', 'viewer'), async (req, res) => {
   try {
-    const tenantId = await getTenantId(req.user);
+    const tenantId = req.user.tenantId;
 
     if (!tenantId) {
       return res.status(403).json({ error: "No tenant found for user" });
@@ -278,8 +379,8 @@ app.get("/api/icons/:id", requireAuth, ensureTenantExists, async (req, res) => {
   }
 });
 
-// POST /api/icons — add a new icon (admin only — check roles in req.user)
-app.post("/api/icons", requireAuth, ensureTenantExists, async (req, res) => {
+// POST /api/icons — add a new icon (admin only)
+app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
   const { id, name, category, svg } = req.body;
 
   if (!id || !name || !category || !svg) {
@@ -287,16 +388,11 @@ app.post("/api/icons", requireAuth, ensureTenantExists, async (req, res) => {
   }
 
   try {
-    const tenantId = await getTenantId(req.user);
+    const tenantId = req.user.tenantId;
 
     if (!tenantId) {
       return res.status(403).json({ error: "No tenant found for user" });
     }
-
-    // TODO: Check if user has admin role before allowing insert
-    // if (req.user.roles && !req.user.roles.includes('admin')) {
-    //   return res.status(403).json({ error: "Admin access required" });
-    // }
 
     await pool.query(
       `INSERT INTO icons (tenant_id, icon_id, name, category, svg)
@@ -304,6 +400,7 @@ app.post("/api/icons", requireAuth, ensureTenantExists, async (req, res) => {
       [tenantId, id, name, category, svg]
     );
 
+    console.log('[API] Icon created by admin:', req.user.email, '- Icon ID:', id);
     res.status(201).json({ ok: true, id });
   } catch (error) {
     console.error('[API] Error creating icon:', error);
@@ -313,6 +410,88 @@ app.post("/api/icons", requireAuth, ensureTenantExists, async (req, res) => {
     }
 
     res.status(500).json({ error: "Failed to create icon" });
+  }
+});
+
+// GET /api/user/profile — get current user's profile and role
+app.get("/api/user/profile", requireAuth, ensureTenantExists, extractUserRole, async (req, res) => {
+  try {
+    const tenantResult = await pool.query(
+      'SELECT name FROM tenants WHERE id = $1',
+      [req.user.tenantId]
+    );
+
+    res.json({
+      name: req.user.name,
+      email: req.user.email || req.user.preferred_username || req.user.unique_name,
+      role: req.user.dbRole,
+      tenant: {
+        id: req.user.tenantId,
+        name: tenantResult.rows[0]?.name || 'Unknown'
+      }
+    });
+  } catch (error) {
+    console.error('[API] Error fetching profile:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// PUT /api/icons/:id — update an existing icon (admin only)
+app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { id } = req.params;
+  const { name, category, svg, is_public } = req.body;
+  const tenantId = req.user.tenantId;
+
+  try {
+    // Verify icon belongs to user's tenant (prevent cross-tenant updates)
+    const existing = await pool.query(
+      'SELECT id FROM icons WHERE icon_id = $1 AND tenant_id = $2',
+      [id, tenantId]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Icon not found or access denied' });
+    }
+
+    // Update icon (only provided fields)
+    await pool.query(
+      `UPDATE icons
+       SET name = COALESCE($1, name),
+           category = COALESCE($2, category),
+           svg = COALESCE($3, svg),
+           is_public = COALESCE($4, is_public),
+           updated_at = NOW()
+       WHERE icon_id = $5 AND tenant_id = $6`,
+      [name, category, svg, is_public, id, tenantId]
+    );
+
+    res.json({ ok: true, message: 'Icon updated successfully' });
+  } catch (error) {
+    console.error('[API] Error updating icon:', error);
+    res.status(500).json({ error: 'Failed to update icon' });
+  }
+});
+
+// DELETE /api/icons/:id — delete an icon (admin only)
+app.delete("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { id } = req.params;
+  const tenantId = req.user.tenantId;
+
+  try {
+    // Verify ownership before deleting
+    const result = await pool.query(
+      'DELETE FROM icons WHERE icon_id = $1 AND tenant_id = $2 RETURNING id',
+      [id, tenantId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Icon not found or access denied' });
+    }
+
+    res.json({ ok: true, message: 'Icon deleted successfully' });
+  } catch (error) {
+    console.error('[API] Error deleting icon:', error);
+    res.status(500).json({ error: 'Failed to delete icon' });
   }
 });
 
