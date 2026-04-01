@@ -51,6 +51,8 @@ Office.onReady(async ({ host }) => {
   const circleBackgroundToggle = document.getElementById("circle-background-toggle");
   const fillToggle           = document.getElementById("fill-toggle");
   const uploadBtn            = document.getElementById("upload-btn");
+  const editModeBtn          = document.getElementById("edit-mode-btn");
+  const editModeText         = document.getElementById("edit-mode-text");
   const uploadModal          = document.getElementById("upload-modal");
   const closeUpload          = document.getElementById("close-upload");
   const svgFileInput         = document.getElementById("svg-file-input");
@@ -72,6 +74,7 @@ Office.onReady(async ({ host }) => {
   let toastTimer     = null;
   let currentUserRole = null;  // 'admin', 'user', 'viewer'
   let currentUserProfile = null; // { name, email, role, tenant }
+  let isEditMode = false;  // Edit mode for deleting icons
 
   // ---- Helpers ----
   function showScreen(name) {
@@ -144,8 +147,8 @@ Office.onReady(async ({ host }) => {
       card.title = icon.name;
       card.innerHTML = `${icon.svg}<span class="icon-name">${icon.name}</span>`;
 
-      // Add delete button for admins on their own tenant's icons
-      if (currentUserRole === 'admin' && currentUserProfile) {
+      // Add delete button in edit mode for admins on their own tenant's icons
+      if (isEditMode && currentUserRole === 'admin' && currentUserProfile) {
         const isOwnIcon = !icon.tenant_name || icon.tenant_name === currentUserProfile.tenant.name;
         if (isOwnIcon) {
           const deleteBtn = document.createElement("button");
@@ -160,7 +163,11 @@ Office.onReady(async ({ host }) => {
         }
       }
 
-      card.addEventListener("click", () => insertIcon(icon, card));
+      // Only allow insertion when not in edit mode
+      if (!isEditMode) {
+        card.addEventListener("click", () => insertIcon(icon, card));
+      }
+
       iconGrid.appendChild(card);
     });
   }
@@ -602,6 +609,23 @@ Office.onReady(async ({ host }) => {
     }
   });
 
+  // ---- Edit Mode Toggle ----
+  editModeBtn.addEventListener("click", () => {
+    isEditMode = !isEditMode;
+    editModeText.textContent = isEditMode ? "Done" : "Edit";
+    editModeBtn.title = isEditMode ? "Exit edit mode" : "Edit library";
+
+    // Visual feedback
+    if (isEditMode) {
+      mainScreen.classList.add("edit-mode");
+      showToast("Tap icons to delete");
+    } else {
+      mainScreen.classList.remove("edit-mode");
+    }
+
+    renderGrid(); // Re-render to show/hide delete buttons
+  });
+
   // ---- Sign-out ----
   signoutBtn.addEventListener("click", async () => {
     try {
@@ -619,14 +643,17 @@ Office.onReady(async ({ host }) => {
   // ---- Update UI based on user role ----
   function updateUIForRole() {
     const uploadBtn = document.getElementById('upload-btn');
+    const editModeBtn = document.getElementById('edit-mode-btn');
     const adminPanelBtn = document.getElementById('admin-panel-btn');
 
     // Show/hide buttons based on role
     if (currentUserRole === 'admin') {
       if (uploadBtn) uploadBtn.style.display = 'flex';
+      if (editModeBtn) editModeBtn.style.display = 'flex';
       if (adminPanelBtn) adminPanelBtn.style.display = 'flex';
     } else {
       if (uploadBtn) uploadBtn.style.display = 'none';
+      if (editModeBtn) editModeBtn.style.display = 'none';
       if (adminPanelBtn) adminPanelBtn.style.display = 'none';
     }
 

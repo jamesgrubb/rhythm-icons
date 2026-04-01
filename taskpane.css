@@ -481,6 +481,16 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   display: flex;
 }
 
+/* In edit mode, show delete buttons persistently (no hover needed) */
+.edit-mode .icon-delete-btn {
+  display: flex;
+}
+
+/* In edit mode, prevent cursor pointer on cards (since they're not clickable for insertion) */
+.edit-mode .icon-card {
+  cursor: default;
+}
+
 /* ---- EMPTY STATE ---- */
 .empty-state {
   display: flex;
