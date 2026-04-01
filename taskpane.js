@@ -61,6 +61,11 @@ Office.onReady(async ({ host }) => {
   const previewGrid          = document.getElementById("preview-grid");
   const previewCount         = document.getElementById("preview-count");
   const copyCodeBtn          = document.getElementById("copy-code-btn");
+  const confirmModal         = document.getElementById("confirm-modal");
+  const confirmTitle         = document.getElementById("confirm-title");
+  const confirmMessage       = document.getElementById("confirm-message");
+  const confirmOkBtn         = document.getElementById("confirm-ok");
+  const confirmCancelBtn     = document.getElementById("confirm-cancel");
 
   // ---- State ----
   let allIcons       = [];
@@ -94,6 +99,32 @@ Office.onReady(async ({ host }) => {
   function setAuthError(msg) {
     authError.textContent = msg;
     authError.classList.toggle("hidden", !msg);
+  }
+
+  // Custom confirm dialog (window.confirm not supported in Office Add-ins)
+  function customConfirm(message, title = "Confirm") {
+    return new Promise((resolve) => {
+      confirmTitle.textContent = title;
+      confirmMessage.textContent = message;
+      confirmModal.classList.remove("hidden");
+
+      const handleOk = () => {
+        confirmModal.classList.add("hidden");
+        confirmOkBtn.removeEventListener("click", handleOk);
+        confirmCancelBtn.removeEventListener("click", handleCancel);
+        resolve(true);
+      };
+
+      const handleCancel = () => {
+        confirmModal.classList.add("hidden");
+        confirmOkBtn.removeEventListener("click", handleOk);
+        confirmCancelBtn.removeEventListener("click", handleCancel);
+        resolve(false);
+      };
+
+      confirmOkBtn.addEventListener("click", handleOk);
+      confirmCancelBtn.addEventListener("click", handleCancel);
+    });
   }
 
   // ---- Render ----
@@ -179,7 +210,12 @@ Office.onReady(async ({ host }) => {
       return;
     }
 
-    if (!confirm(`Delete "${icon.name}"?`)) {
+    const confirmed = await customConfirm(
+      `Delete "${icon.name}"?`,
+      'Delete Icon'
+    );
+
+    if (!confirmed) {
       return;
     }
 
