@@ -15,8 +15,17 @@ function updateDebugStatus(msg) {
 
 updateDebugStatus("Script loaded");
 
+let bootstrapped = false; // Prevent double initialization
+
 Office.onReady(async ({ host }) => {
   updateDebugStatus(`Office.onReady fired! Host: ${host}`);
+
+  if (bootstrapped) {
+    updateDebugStatus("Already bootstrapped, skipping duplicate Office.onReady");
+    return;
+  }
+  bootstrapped = true;
+
   const currentHost = host; // Office.HostType.Word | Office.HostType.PowerPoint
 
   // ---- DOM refs ----
