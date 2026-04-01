@@ -70,6 +70,8 @@ Office.onReady(async ({ host }) => {
   let fillMode       = false;  // Use fill instead of stroke
   let uploadedIcons  = [];  // Temporary storage for bulk uploaded icons
   let toastTimer     = null;
+  let currentUserRole = null;  // 'admin', 'user', 'viewer'
+  let currentUserProfile = null; // { name, email, role, tenant }
 
   // ---- Helpers ----
   function showScreen(name) {
@@ -125,13 +127,74 @@ Office.onReady(async ({ host }) => {
       card.className = "icon-card";
       card.title = icon.name;
       card.innerHTML = `${icon.svg}<span class="icon-name">${icon.name}</span>`;
+
+      // Add delete button for admins on their own tenant's icons
+      if (currentUserRole === 'admin' && currentUserProfile) {
+        const isOwnIcon = !icon.tenant_name || icon.tenant_name === currentUserProfile.tenant.name;
+        if (isOwnIcon) {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "icon-delete-btn";
+          deleteBtn.innerHTML = "&times;";
+          deleteBtn.title = "Delete icon";
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation(); // Prevent card click (insert)
+            deleteIcon(icon);
+          });
+          card.appendChild(deleteBtn);
+        }
+      }
+
       card.addEventListener("click", () => insertIcon(icon, card));
       iconGrid.appendChild(card);
     });
   }
 
+  // ---- Delete icon (admin only) ----
+  async function deleteIcon(icon) {
+    if (currentUserRole !== 'admin') {
+      showToast('Only admins can delete icons');
+      return;
+    }
+
+    if (!confirm(`Delete "${icon.name}"?`)) {
+      return;
+    }
+
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/icons/${icon.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete icon');
+      }
+
+      // Remove from local array
+      allIcons = allIcons.filter(i => i.id !== icon.id);
+
+      // Re-render UI
+      const categories = getCategories(allIcons);
+      renderTabs(categories);
+      renderGrid();
+
+      showToast(`"${icon.name}" deleted`);
+    } catch (error) {
+      console.error('[Delete] Error:', error);
+      showToast(`Error: ${error.message}`);
+    }
+  }
+
   // ---- Insert icon into document ----
   async function insertIcon(icon, cardEl) {
+    // Block insertions for viewers
+    if (currentUserRole === 'viewer') {
+      showToast('Viewer role cannot insert icons');
+      return;
+    }
+
     console.log("[Insert] Starting insertion for:", icon.name);
     updateDebugStatus(`Inserting ${icon.name}...`);
     cardEl.classList.add("inserting");
@@ -537,8 +600,59 @@ Office.onReady(async ({ host }) => {
     }
   });
 
+  // ---- Update UI based on user role ----
+  function updateUIForRole() {
+    const uploadBtn = document.getElementById('upload-btn');
+    const adminPanelBtn = document.getElementById('admin-panel-btn');
+
+    // Show/hide buttons based on role
+    if (currentUserRole === 'admin') {
+      if (uploadBtn) uploadBtn.style.display = 'flex';
+      if (adminPanelBtn) adminPanelBtn.style.display = 'flex';
+    } else {
+      if (uploadBtn) uploadBtn.style.display = 'none';
+      if (adminPanelBtn) adminPanelBtn.style.display = 'none';
+    }
+
+    // Update header with user info
+    const headerActions = document.querySelector('.header-actions');
+    if (headerActions && currentUserProfile) {
+      // Remove existing user info if any
+      const existingUserInfo = headerActions.querySelector('.user-info');
+      if (existingUserInfo) existingUserInfo.remove();
+
+      const userInfo = document.createElement('div');
+      userInfo.className = 'user-info';
+      userInfo.innerHTML = `
+        <span style="color: #888; font-size: 11px;">${currentUserProfile.tenant.name}</span>
+        <span class="role-badge role-${currentUserRole}">${currentUserRole.toUpperCase()}</span>
+      `;
+      headerActions.prepend(userInfo);
+    }
+  }
+
   // ---- Load icons ----
   async function loadIcons(accessToken) {
+    // Fetch user profile first
+    if (accessToken) {
+      try {
+        const profileRes = await fetch(`${ICON_API_BASE}/user/profile`, {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+
+        if (profileRes.ok) {
+          currentUserProfile = await profileRes.json();
+          currentUserRole = currentUserProfile.role;
+          console.log('[Profile] User role:', currentUserRole, 'Tenant:', currentUserProfile.tenant.name);
+          updateUIForRole();
+        }
+      } catch (err) {
+        console.warn('[Profile] Failed to fetch user profile:', err);
+        currentUserRole = 'viewer'; // Safe default
+      }
+    }
+
+    // Fetch icons
     allIcons = await fetchIconsFromAPI(accessToken);
     const categories = getCategories(allIcons);
     renderTabs(categories);
@@ -558,7 +672,18 @@ Office.onReady(async ({ host }) => {
       updateDebugStatus("Loading sample icons...");
       // Hide sign-out button in dev mode
       signoutBtn.style.display = 'none';
+
+      // Simulate admin role in dev mode
+      currentUserRole = 'admin';
+      currentUserProfile = {
+        name: 'Dev User',
+        email: 'dev@example.com',
+        role: 'admin',
+        tenant: { name: 'Development', id: 1 }
+      };
+
       await loadIcons(null); // null token = uses SAMPLE_ICONS fallback
+      updateUIForRole(); // Apply role-based UI updates
       updateDebugStatus(`${allIcons.length} icons loaded`);
       updateDebugStatus("Switching to main screen");
       showScreen("main");
@@ -785,41 +910,60 @@ Office.onReady(async ({ host }) => {
     });
   }
 
-  copyCodeBtn.addEventListener("click", () => {
-    const code = uploadedIcons.map(icon => {
-      // Escape backticks and backslashes in SVG content
-      const escapedSvg = icon.svg.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
-      // Escape double quotes in strings
-      const escapedName = icon.name.replace(/"/g, '\\"');
-      const escapedCategory = icon.category.replace(/"/g, '\\"');
+  copyCodeBtn.addEventListener("click", async () => {
+    if (uploadedIcons.length === 0) return;
 
-      return `  { id: "${icon.id}", name: "${escapedName}", category: "${escapedCategory}", svg: \`${escapedSvg}\` }`;
-    }).join(',\n');
+    copyCodeBtn.disabled = true;
+    copyCodeBtn.textContent = `Uploading ${uploadedIcons.length} icons...`;
 
-    // Show preview in console for verification
-    console.log("[Upload] Generated code:");
-    console.log(code);
+    try {
+      const token = await getAccessToken();
+      let successCount = 0;
 
-    navigator.clipboard.writeText(code).then(() => {
-      // Add uploaded icons to main library
-      allIcons = [...allIcons, ...uploadedIcons];
+      for (const icon of uploadedIcons) {
+        try {
+          const res = await fetch(`${ICON_API_BASE}/icons`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              id: icon.id,
+              name: icon.name,
+              category: icon.category,
+              svg: icon.svg
+            })
+          });
 
-      // Refresh categories and grid
-      const categories = getCategories(allIcons);
-      renderTabs(categories);
-      renderGrid();
+          if (res.ok) {
+            successCount++;
+          } else {
+            const error = await res.json();
+            console.error('[Upload] Failed:', icon.name, error);
+          }
+        } catch (err) {
+          console.error('[Upload] Failed:', icon.name, err);
+        }
+      }
 
-      showToast(`${uploadedIcons.length} icons added to library!`);
+      // Reload icons from API to get updated list
+      await loadIcons(token);
+
+      showToast(`Uploaded ${successCount} of ${uploadedIcons.length} icons`);
 
       // Close modal and reset
       uploadModal.classList.add("hidden");
       uploadedIcons = [];
       previewSection.classList.add("hidden");
       svgFileInput.value = "";
-    }).catch(err => {
-      console.error("Copy failed:", err);
-      showToast("Copy failed");
-    });
+    } catch (err) {
+      console.error('[Upload] Error:', err);
+      showToast(`Error: ${err.message}`);
+    } finally {
+      copyCodeBtn.disabled = false;
+      copyCodeBtn.textContent = 'Upload to Library';
+    }
   });
 
   await bootstrap();
