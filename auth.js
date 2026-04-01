@@ -22,7 +22,7 @@ const msalConfig = {
     redirectUri: AUTH_CONFIG.redirectUri,
   },
   cache: {
-    cacheLocation:      "sessionStorage",
+    cacheLocation:      "localStorage", // Use localStorage to persist across taskpane reopens
     storeAuthStateInCookie: true, // needed for IE11 / some Office clients
   },
   system: {

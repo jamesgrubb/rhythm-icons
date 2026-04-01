@@ -1,0 +1,50 @@
+Subject: [Quick Test - 10 min] Icon Library Add-in for Word/PowerPoint
+
+Hi [Name],
+
+I've built an Icon Library add-in for Microsoft Word and PowerPoint that gives quick access to curated icons. Can you help me test it? It'll take about 10 minutes.
+
+🎯 WHAT YOU'LL DO:
+• Install the add-in (1 click)
+• Sign in with your Microsoft account
+• Browse and insert a few icons
+• Let me know if anything breaks!
+
+📦 REQUIREMENTS:
+• Microsoft Word OR PowerPoint (Desktop or Web - either works)
+• Any Microsoft account (work, school, or personal @outlook.com)
+
+📋 INSTRUCTIONS:
+1. Download the attached "manifest.xml" file (or get it from: [LINK_IF_USING_CLOUD_STORAGE])
+2. Open Word or PowerPoint
+3. Go to Insert → Add-ins → Get Add-ins
+4. Click "My Add-ins" (bottom left) → "Upload My Add-in" (top right)
+5. Select the manifest.xml file
+6. Look for "Icon Library" button in the Home tab → Click "Show Taskpane"
+7. Sign in with your Microsoft account
+8. Try clicking some icons to insert them!
+
+🐛 IF SOMETHING GOES WRONG:
+• Screenshot any error messages
+• Press F12 in your browser and screenshot the Console tab (if there are red errors)
+• Reply to this email with the screenshots
+
+📝 FEEDBACK I NEED:
+1. Did sign-in work? (Yes/No)
+2. Did icons load? (Yes/No)
+3. Could you insert icons? (Yes/No)
+4. Any bugs, glitches, or suggestions?
+
+That's it! Super simple.
+
+Thanks so much for helping test! 🙏
+
+Best,
+[Your Name]
+[Your Email]
+[Your Phone - optional]
+
+---
+P.S. The add-in requires permissions to read icons - this is normal. Click "Accept" when prompted.
+
+Attachments: manifest.xml (or link to cloud storage)

@@ -71,7 +71,7 @@
         redirectUri: AUTH_CONFIG.redirectUri,
       },
       cache: {
-        cacheLocation: "sessionStorage",
+        cacheLocation: "localStorage", // Use localStorage to persist across windows
         storeAuthStateInCookie: true,
       },
     };
