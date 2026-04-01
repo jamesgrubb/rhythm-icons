@@ -141,16 +141,32 @@ async function signIn() {
           }
 
           const dialog = result.value;
-          console.log("[Auth] Dialog opened successfully");
+          console.log("[Auth] Dialog opened successfully, dialog object:", !!dialog);
+          console.log("[Auth] Dialog has addEventHandler?", typeof dialog.addEventHandler);
 
           // Listen for messages from the dialog
-          dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
-            if (dialogClosed) return;
+          const messageReceivedHandler = (arg) => {
+            console.log("[Auth] *** DialogMessageReceived event fired! ***", arg);
+
+            if (dialogClosed) {
+              console.log("[Auth] Dialog already closed, ignoring message");
+              return;
+            }
+
             dialogClosed = true;
-            dialog.close();
+            console.log("[Auth] Closing dialog...");
+
+            try {
+              dialog.close();
+              console.log("[Auth] Dialog.close() called successfully");
+            } catch (closeErr) {
+              console.error("[Auth] Error calling dialog.close():", closeErr);
+            }
+
             window.removeEventListener("message", messageHandler);
 
             try {
+              console.log("[Auth] Parsing message:", arg.message);
               const response = JSON.parse(arg.message);
               console.log("[Auth] Received message from dialog:", response.status);
 
@@ -166,19 +182,25 @@ async function signIn() {
                 reject(new Error(response.error || "Authentication failed"));
               }
             } catch (err) {
-              console.error("[Auth] Failed to parse dialog message:", err);
+              console.error("[Auth] Failed to parse dialog message:", err, "Raw message:", arg.message);
               reject(new Error("Failed to process authentication response"));
             }
-          });
+          };
+
+          dialog.addEventHandler(Office.EventType.DialogMessageReceived, messageReceivedHandler);
+          console.log("[Auth] DialogMessageReceived handler attached");
 
           // Handle dialog closed by user
           dialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
+            console.log("[Auth] DialogEventReceived fired, error:", arg.error);
             if (dialogClosed) return;
-            console.log("[Auth] Dialog event:", arg.error);
+            console.log("[Auth] Dialog closed by user");
             dialogClosed = true;
             window.removeEventListener("message", messageHandler);
             reject(new Error("Authentication cancelled by user"));
           });
+
+          console.log("[Auth] All dialog event handlers attached");
         }
       );
     });
