@@ -708,6 +708,7 @@ function filterIcons(icons, { category = "All", query = "" } = {}) {
 }
 
 // Expose to window for cross-file access
+window.ICON_API_BASE = ICON_API_BASE;
 window.fetchIconsFromAPI = fetchIconsFromAPI;
 window.getCategories = getCategories;
 window.filterIcons = filterIcons;
