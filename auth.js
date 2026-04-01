@@ -18,7 +18,7 @@ const AUTH_CONFIG = window.AUTH_CONFIG;
 const msalConfig = {
   auth: {
     clientId:    AUTH_CONFIG.clientId,
-    authority:   `https://login.microsoftonline.com/${AUTH_CONFIG.tenantId}`,
+    authority:   'https://login.microsoftonline.com/common', // Multi-tenant: accepts users from any Azure AD org
     redirectUri: AUTH_CONFIG.redirectUri,
   },
   cache: {
