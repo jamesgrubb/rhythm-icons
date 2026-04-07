@@ -381,23 +381,23 @@ Office.onReady(async ({ host }) => {
         const scheme = masters.items[0].themeColorScheme;
         console.log("[Theme] Theme color scheme object:", scheme ? "available" : "null");
 
-        const colors = {};
+        // Load all theme color properties (lowercase property names)
+        scheme.load("background1, background2, text1, text2, accent1, accent2, accent3, accent4, accent5, accent6");
+        await context.sync();
 
-        // Fetch all theme colors
-        const colorNames = ["Background1", "Background2", "Text1", "Text2",
-                           "Accent1", "Accent2", "Accent3", "Accent4", "Accent5", "Accent6"];
-
-        for (const name of colorNames) {
-          try {
-            const color = scheme.getThemeColor(name);
-            // getThemeColor() returns a plain string value, not a proxy object
-            colors[name] = color;
-            console.log(`[Theme] ✓ ${name}: ${color}`);
-          } catch (err) {
-            console.error(`[Theme] ✗ Failed to get ${name}:`, err.message, err.code);
-            colors[name] = fallbackColors[name];
-          }
-        }
+        // Map lowercase properties to our capitalized naming convention
+        const colors = {
+          Background1: scheme.background1,
+          Background2: scheme.background2,
+          Text1: scheme.text1,
+          Text2: scheme.text2,
+          Accent1: scheme.accent1,
+          Accent2: scheme.accent2,
+          Accent3: scheme.accent3,
+          Accent4: scheme.accent4,
+          Accent5: scheme.accent5,
+          Accent6: scheme.accent6
+        };
 
         console.log("[Theme] Successfully fetched theme colors:", colors);
         return colors;
