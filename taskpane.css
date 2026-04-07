@@ -360,13 +360,13 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 .color-label { font-size: 11px; color: var(--text-3); }
 .color-options { display: flex; gap: 3px; flex-wrap: wrap; }
 .color-btn {
-  min-width: 28px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 3px;
   transition: all 0.1s;
   display: flex;
   align-items: center;
@@ -382,18 +382,13 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
-.color-name {
-  font-size: 9px;
-  font-family: var(--mono);
-  font-weight: 600;
-  color: var(--text-2);
-  letter-spacing: -0.3px;
-}
-.color-btn:hover .color-name {
-  color: var(--text);
-}
-.color-btn.active .color-name {
-  color: var(--accent);
+.color-swatch {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--border-2);
+  display: block;
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 /* ---- BACKGROUND BAR ---- */

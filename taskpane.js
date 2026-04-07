@@ -79,6 +79,7 @@ Office.onReady(async ({ host }) => {
   let currentUserRole = null;  // 'admin', 'user', 'viewer'
   let currentUserProfile = null; // { name, email, role, tenant }
   let isEditMode = false;  // Edit mode for deleting icons
+  let themeColors = null; // Actual PowerPoint theme colors (fetched via API)
 
   // ---- Helpers ----
   function showScreen(name) {
@@ -326,14 +327,10 @@ Office.onReady(async ({ host }) => {
     });
   }
 
-  // ---- PowerPoint insertion: Insert SVG with theme color support ----
-  async function insertIntoPowerPoint(icon) {
-    console.log("[PPT] Preparing SVG with theme colors...");
-    console.log("[PPT] Using theme color:", selectedColor);
-    console.log("[PPT] Original SVG:", icon.svg.substring(0, 500));
-
-    // Fallback colors for each theme color (Office default theme)
-    const themeColorMap = {
+  // ---- Fetch PowerPoint theme colors ----
+  async function fetchThemeColors() {
+    // Fallback colors (Office default theme)
+    const fallbackColors = {
       Background1: "#FFFFFF",
       Background2: "#F5F5F5",
       Text1: "#000000",
@@ -346,7 +343,82 @@ Office.onReady(async ({ host }) => {
       Accent6: "#70AD47"
     };
 
-    const fallbackColor = themeColorMap[selectedColor] || "#4472C4";
+    if (currentHost !== Office.HostType.PowerPoint) {
+      console.log("[Theme] Not PowerPoint, using fallback colors");
+      return fallbackColors;
+    }
+
+    try {
+      console.log("[Theme] Attempting to fetch PowerPoint theme colors...");
+
+      return await PowerPoint.run(async (context) => {
+        const masters = context.presentation.slideMasters;
+        masters.load("items");
+        await context.sync();
+
+        if (masters.items.length === 0) {
+          console.warn("[Theme] No slide masters found, using fallback");
+          return fallbackColors;
+        }
+
+        const scheme = masters.items[0].themeColorScheme;
+        const colors = {};
+
+        // Fetch all theme colors
+        const colorNames = ["Background1", "Background2", "Text1", "Text2",
+                           "Accent1", "Accent2", "Accent3", "Accent4", "Accent5", "Accent6"];
+
+        for (const name of colorNames) {
+          try {
+            const color = scheme.getThemeColor(name);
+            color.load("value");
+            await context.sync();
+            colors[name] = color.value;
+            console.log(`[Theme] ${name}: ${color.value}`);
+          } catch (err) {
+            console.warn(`[Theme] Failed to get ${name}, using fallback:`, err);
+            colors[name] = fallbackColors[name];
+          }
+        }
+
+        console.log("[Theme] Successfully fetched theme colors");
+        return colors;
+      });
+    } catch (error) {
+      console.warn("[Theme] API failed (likely PowerPoint Online bug), using fallback:", error);
+      return fallbackColors;
+    }
+  }
+
+  // ---- Update color button swatches ----
+  function updateColorSwatches() {
+    if (!themeColors) return;
+
+    colorBtns.forEach(btn => {
+      const colorName = btn.dataset.color;
+      const hexColor = themeColors[colorName];
+
+      if (hexColor) {
+        // Update the button's swatch background
+        const swatch = btn.querySelector('.color-swatch');
+        if (swatch) {
+          swatch.style.backgroundColor = hexColor;
+        }
+
+        // Update tooltip to show hex value
+        btn.title = `${colorName}: ${hexColor}`;
+      }
+    });
+  }
+
+  // ---- PowerPoint insertion: Insert SVG with theme color support ----
+  async function insertIntoPowerPoint(icon) {
+    console.log("[PPT] Preparing SVG with theme colors...");
+    console.log("[PPT] Using theme color:", selectedColor);
+    console.log("[PPT] Original SVG:", icon.svg.substring(0, 500));
+
+    // Use fetched theme colors or fallback
+    const fallbackColor = themeColors ? themeColors[selectedColor] : "#4472C4";
     const themeClass = `MsftOfcThm_${selectedColor}`;
 
     // Prepare SVG with proper structure and theme color classes
@@ -671,6 +743,13 @@ Office.onReady(async ({ host }) => {
     try {
       const token = await signIn();
       await loadIcons(token);
+
+      // Fetch theme colors (PowerPoint only)
+      if (currentHost === Office.HostType.PowerPoint) {
+        themeColors = await fetchThemeColors();
+        updateColorSwatches();
+      }
+
       showScreen("main");
     } catch (err) {
       console.error("[Auth] Sign-in failed:", err);
@@ -808,6 +887,15 @@ Office.onReady(async ({ host }) => {
       await loadIcons(null); // null token = uses SAMPLE_ICONS fallback
       updateUIForRole(); // Apply role-based UI updates
       updateDebugStatus(`${allIcons.length} icons loaded`);
+
+      // Fetch theme colors (PowerPoint only)
+      if (currentHost === Office.HostType.PowerPoint) {
+        updateDebugStatus("Fetching theme colors...");
+        themeColors = await fetchThemeColors();
+        updateColorSwatches();
+        updateDebugStatus("Theme colors loaded");
+      }
+
       updateDebugStatus("Switching to main screen");
       showScreen("main");
       return;
@@ -823,7 +911,17 @@ Office.onReady(async ({ host }) => {
         updateDebugStatus("Session restored! Loading icons...");
         try {
           await loadIcons(token);
-          updateDebugStatus("Icons loaded, showing main screen");
+          updateDebugStatus("Icons loaded");
+
+          // Fetch theme colors (PowerPoint only)
+          if (currentHost === Office.HostType.PowerPoint) {
+            updateDebugStatus("Fetching theme colors...");
+            themeColors = await fetchThemeColors();
+            updateColorSwatches();
+            updateDebugStatus("Theme colors loaded");
+          }
+
+          updateDebugStatus("Showing main screen");
           showScreen("main");
         } catch (loadErr) {
           updateDebugStatus(`Load error: ${loadErr.message}`);
