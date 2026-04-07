@@ -52,7 +52,6 @@ Office.onReady(async ({ host }) => {
   const fillToggle           = document.getElementById("fill-toggle");
   const uploadBtn            = document.getElementById("upload-btn");
   const editModeBtn          = document.getElementById("edit-mode-btn");
-  const editModeText         = document.getElementById("edit-mode-text");
   const uploadModal          = document.getElementById("upload-modal");
   const closeUpload          = document.getElementById("close-upload");
   const svgFileInput         = document.getElementById("svg-file-input");
@@ -648,14 +647,22 @@ Office.onReady(async ({ host }) => {
   // ---- Edit Mode Toggle ----
   editModeBtn.addEventListener("click", () => {
     isEditMode = !isEditMode;
-    editModeText.textContent = isEditMode ? "Done" : "Edit";
-    editModeBtn.title = isEditMode ? "Exit edit mode" : "Edit library";
 
-    // Visual feedback
+    // Toggle icons and visual state
+    const normalIcon = document.getElementById("edit-icon-normal");
+    const activeIcon = document.getElementById("edit-icon-active");
     if (isEditMode) {
+      normalIcon.style.display = "none";
+      activeIcon.style.display = "block";
+      editModeBtn.classList.add("active");
+      editModeBtn.title = "Exit edit mode";
       mainScreen.classList.add("edit-mode");
       showToast("Tap icons to delete");
     } else {
+      normalIcon.style.display = "block";
+      activeIcon.style.display = "none";
+      editModeBtn.classList.remove("active");
+      editModeBtn.title = "Edit library";
       mainScreen.classList.remove("edit-mode");
     }
 
@@ -694,19 +701,12 @@ Office.onReady(async ({ host }) => {
     }
 
     // Update header with user info
-    const headerActions = document.querySelector('.header-actions');
-    if (headerActions && currentUserProfile) {
-      // Remove existing user info if any
-      const existingUserInfo = headerActions.querySelector('.user-info');
-      if (existingUserInfo) existingUserInfo.remove();
-
-      const userInfo = document.createElement('div');
-      userInfo.className = 'user-info';
-      userInfo.innerHTML = `
-        <span style="color: #888; font-size: 11px;">${currentUserProfile.tenant.name}</span>
+    const userInfoContainer = document.getElementById('user-info-container');
+    if (userInfoContainer && currentUserProfile) {
+      userInfoContainer.innerHTML = `
+        <span class="user-tenant">${currentUserProfile.tenant.name}</span>
         <span class="role-badge role-${currentUserRole}">${currentUserRole.toUpperCase()}</span>
       `;
-      headerActions.prepend(userInfo);
     }
   }
 
