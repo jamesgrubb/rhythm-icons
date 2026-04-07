@@ -349,7 +349,13 @@ Office.onReady(async ({ host }) => {
     const svgContent = svgContentMatch ? svgContentMatch[1] : svg;
 
     // Determine if icon uses stroke or fill (user can override with fillMode toggle)
-    const usesStroke = !fillMode && (svg.includes('stroke="currentColor"') || svg.includes('stroke-width'));
+    // Check for any stroke-related attributes
+    const hasStrokeAttr = svg.includes('stroke="') || svg.includes("stroke='");
+    const hasStrokeWidth = svg.includes('stroke-width');
+    const hasStrokeLinecap = svg.includes('stroke-linecap');
+    const hasStrokeLinejoin = svg.includes('stroke-linejoin');
+
+    const usesStroke = !fillMode && (hasStrokeAttr || hasStrokeWidth || hasStrokeLinecap || hasStrokeLinejoin);
 
     if (usesStroke) {
       // For stroke icons: Use internal CSS with theme class (BrightCarbon method)
