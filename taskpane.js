@@ -390,10 +390,9 @@ Office.onReady(async ({ host }) => {
         for (const name of colorNames) {
           try {
             const color = scheme.getThemeColor(name);
-            color.load("value");
-            await context.sync();
-            colors[name] = color.value;
-            console.log(`[Theme] ✓ ${name}: ${color.value}`);
+            // getThemeColor() returns a plain string value, not a proxy object
+            colors[name] = color;
+            console.log(`[Theme] ✓ ${name}: ${color}`);
           } catch (err) {
             console.error(`[Theme] ✗ Failed to get ${name}:`, err.message, err.code);
             colors[name] = fallbackColors[name];
