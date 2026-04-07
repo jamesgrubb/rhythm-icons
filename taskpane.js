@@ -351,11 +351,14 @@ Office.onReady(async ({ host }) => {
 
     try {
       console.log("[Theme] Attempting to fetch PowerPoint theme colors...");
+      console.log("[Theme] PowerPoint.js available:", typeof PowerPoint !== 'undefined');
 
       return await PowerPoint.run(async (context) => {
         const masters = context.presentation.slideMasters;
         masters.load("items");
         await context.sync();
+
+        console.log("[Theme] Slide masters count:", masters.items.length);
 
         if (masters.items.length === 0) {
           console.warn("[Theme] No slide masters found, using fallback");
@@ -363,6 +366,8 @@ Office.onReady(async ({ host }) => {
         }
 
         const scheme = masters.items[0].themeColorScheme;
+        console.log("[Theme] Theme color scheme object:", scheme ? "available" : "null");
+
         const colors = {};
 
         // Fetch all theme colors
@@ -375,18 +380,20 @@ Office.onReady(async ({ host }) => {
             color.load("value");
             await context.sync();
             colors[name] = color.value;
-            console.log(`[Theme] ${name}: ${color.value}`);
+            console.log(`[Theme] ✓ ${name}: ${color.value}`);
           } catch (err) {
-            console.warn(`[Theme] Failed to get ${name}, using fallback:`, err);
+            console.error(`[Theme] ✗ Failed to get ${name}:`, err.message);
             colors[name] = fallbackColors[name];
           }
         }
 
-        console.log("[Theme] Successfully fetched theme colors");
+        console.log("[Theme] Successfully fetched theme colors:", colors);
         return colors;
       });
     } catch (error) {
-      console.warn("[Theme] API failed (likely PowerPoint Online bug), using fallback:", error);
+      console.error("[Theme] API failed:", error);
+      console.error("[Theme] Error details:", error.message, error.stack);
+      console.log("[Theme] Using fallback colors");
       return fallbackColors;
     }
   }
