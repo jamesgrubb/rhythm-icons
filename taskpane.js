@@ -352,6 +352,19 @@ Office.onReady(async ({ host }) => {
     try {
       console.log("[Theme] Attempting to fetch PowerPoint theme colors...");
       console.log("[Theme] PowerPoint.js available:", typeof PowerPoint !== 'undefined');
+      console.log("[Theme] Office.context.requirements available:", typeof Office.context.requirements !== 'undefined');
+
+      // Check if PowerPointApi 1.10 is supported
+      if (Office.context.requirements && Office.context.requirements.isSetSupported) {
+        const isPptApi110Supported = Office.context.requirements.isSetSupported('PowerPointApi', '1.10');
+        console.log("[Theme] PowerPointApi 1.10 supported:", isPptApi110Supported);
+
+        if (!isPptApi110Supported) {
+          console.warn("[Theme] PowerPointApi 1.10 not supported - theme color API unavailable");
+          console.warn("[Theme] Your PowerPoint version may be too old. Update to latest version.");
+          return fallbackColors;
+        }
+      }
 
       return await PowerPoint.run(async (context) => {
         const masters = context.presentation.slideMasters;
@@ -382,7 +395,7 @@ Office.onReady(async ({ host }) => {
             colors[name] = color.value;
             console.log(`[Theme] ✓ ${name}: ${color.value}`);
           } catch (err) {
-            console.error(`[Theme] ✗ Failed to get ${name}:`, err.message);
+            console.error(`[Theme] ✗ Failed to get ${name}:`, err.message, err.code);
             colors[name] = fallbackColors[name];
           }
         }
@@ -392,7 +405,12 @@ Office.onReady(async ({ host }) => {
       });
     } catch (error) {
       console.error("[Theme] API failed:", error);
-      console.error("[Theme] Error details:", error.message, error.stack);
+      console.error("[Theme] Error name:", error.name);
+      console.error("[Theme] Error code:", error.code);
+      console.error("[Theme] Error message:", error.message);
+      if (error.debugInfo) {
+        console.error("[Theme] Debug info:", JSON.stringify(error.debugInfo, null, 2));
+      }
       console.log("[Theme] Using fallback colors");
       return fallbackColors;
     }

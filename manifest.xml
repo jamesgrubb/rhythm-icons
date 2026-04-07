@@ -33,7 +33,18 @@
 
   <Permissions>ReadWriteDocument</Permissions>
 
+  <Requirements>
+    <Sets DefaultMinVersion="1.1">
+      <Set Name="SharedApi" MinVersion="1.1" />
+    </Sets>
+  </Requirements>
+
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Requirements>
+      <Sets DefaultMinVersion="1.1">
+        <Set Name="SharedApi" MinVersion="1.1" />
+      </Sets>
+    </Requirements>
     <Hosts>
 
       <!-- WORD -->
@@ -77,6 +88,11 @@
 
       <!-- POWERPOINT -->
       <Host xsi:type="Presentation">
+        <Requirements>
+          <Sets DefaultMinVersion="1.1">
+            <Set Name="PowerPointApi" MinVersion="1.10" />
+          </Sets>
+        </Requirements>
         <DesktopFormFactor>
           <GetStarted>
             <Title resid="GetStarted.Title" />
