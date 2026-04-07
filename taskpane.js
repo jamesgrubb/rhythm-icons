@@ -198,7 +198,15 @@ Office.onReady(async ({ host }) => {
       const card = document.createElement("div");
       card.className = "icon-card";
       card.title = icon.name;
-      card.innerHTML = `${icon.svg}<span class="icon-name">${icon.name}</span>`;
+
+      // Prepare SVG for thumbnail: strip hardcoded stroke/fill colors so CSS can style it
+      let thumbnailSvg = icon.svg;
+      thumbnailSvg = thumbnailSvg.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="currentColor"');
+      thumbnailSvg = thumbnailSvg.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="currentColor"');
+      thumbnailSvg = thumbnailSvg.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
+      thumbnailSvg = thumbnailSvg.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
+
+      card.innerHTML = `${thumbnailSvg}<span class="icon-name">${icon.name}</span>`;
 
       // Add delete button in edit mode for admins on their own tenant's icons
       if (isEditMode && currentUserRole === 'admin' && currentUserProfile) {

@@ -460,9 +460,11 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   color: var(--text-2);
   flex-shrink: 0;
 }
-/* Override stroke width for icon previews */
+/* Override stroke width and ensure stroke inherits color for icon previews */
 .icon-card svg * {
   stroke-width: 0.5px !important;
+  stroke: currentColor !important;
+  fill: none !important;
 }
 .icon-name {
   font-size: 9.5px;
