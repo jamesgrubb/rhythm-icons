@@ -384,13 +384,25 @@ Office.onReady(async ({ host }) => {
         console.log("[Theme] Theme color scheme object:", scheme ? "available" : "null");
 
         const colors = {};
-        const colorNames = ["Background1", "Background2", "Text1", "Text2",
-                           "Accent1", "Accent2", "Accent3", "Accent4", "Accent5", "Accent6"];
 
-        // Use getThemeColor() method for each color
-        for (const name of colorNames) {
+        // Map color names to PowerPoint.ThemeColor enum values
+        const colorMap = {
+          Background1: PowerPoint.ThemeColor.background1,
+          Background2: PowerPoint.ThemeColor.background2,
+          Text1: PowerPoint.ThemeColor.text1,
+          Text2: PowerPoint.ThemeColor.text2,
+          Accent1: PowerPoint.ThemeColor.accent1,
+          Accent2: PowerPoint.ThemeColor.accent2,
+          Accent3: PowerPoint.ThemeColor.accent3,
+          Accent4: PowerPoint.ThemeColor.accent4,
+          Accent5: PowerPoint.ThemeColor.accent5,
+          Accent6: PowerPoint.ThemeColor.accent6
+        };
+
+        // Use getThemeColor() method with enum values
+        for (const [name, enumValue] of Object.entries(colorMap)) {
           try {
-            const color = scheme.getThemeColor(name);
+            const color = scheme.getThemeColor(enumValue);
             await context.sync();
             colors[name] = color.value;
             console.log(`[Theme] ✓ ${name}: ${color.value}`);
