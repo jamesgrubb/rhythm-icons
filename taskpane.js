@@ -80,6 +80,7 @@ Office.onReady(async ({ host }) => {
   let currentUserProfile = null; // { name, email, role, tenant }
   let isEditMode = false;  // Edit mode for deleting icons
   let themeColors = null; // Actual PowerPoint theme colors (fetched via API)
+  let themeRefreshInterval = null; // Interval for periodic theme color refresh
 
   // ---- Helpers ----
   function showScreen(name) {
@@ -409,6 +410,69 @@ Office.onReady(async ({ host }) => {
         btn.title = `${colorName}: ${hexColor}`;
       }
     });
+  }
+
+  // ---- Refresh theme colors (detects theme changes) ----
+  async function refreshThemeColors() {
+    if (currentHost !== Office.HostType.PowerPoint) return;
+
+    try {
+      const newColors = await fetchThemeColors();
+
+      // Check if theme colors have changed
+      const hasChanged = !themeColors || Object.keys(newColors).some(key =>
+        newColors[key] !== themeColors[key]
+      );
+
+      if (hasChanged) {
+        console.log("[Theme] Theme colors changed, updating UI");
+        themeColors = newColors;
+        updateColorSwatches();
+      }
+    } catch (error) {
+      console.warn("[Theme] Failed to refresh theme colors:", error);
+    }
+  }
+
+  // ---- Start periodic theme color refresh ----
+  function startThemeRefresh() {
+    if (currentHost !== Office.HostType.PowerPoint) return;
+
+    // Clear any existing interval
+    if (themeRefreshInterval) {
+      clearInterval(themeRefreshInterval);
+    }
+
+    // Add Office theme change event listener (for Office app theme changes)
+    try {
+      if (Office.context.officeTheme) {
+        Office.context.document.addHandlerAsync(
+          Office.EventType.DocumentThemeChanged,
+          () => {
+            console.log("[Theme] Office theme changed event detected");
+            refreshThemeColors();
+          }
+        );
+      }
+    } catch (err) {
+      console.log("[Theme] Theme change event not available:", err);
+    }
+
+    // Check for theme changes every 5 seconds (for PowerPoint document theme changes)
+    themeRefreshInterval = setInterval(() => {
+      refreshThemeColors();
+    }, 5000);
+
+    console.log("[Theme] Started periodic theme refresh (every 5s)");
+  }
+
+  // ---- Stop theme refresh ----
+  function stopThemeRefresh() {
+    if (themeRefreshInterval) {
+      clearInterval(themeRefreshInterval);
+      themeRefreshInterval = null;
+      console.log("[Theme] Stopped theme refresh");
+    }
   }
 
   // ---- PowerPoint insertion: Insert SVG with theme color support ----
@@ -748,6 +812,7 @@ Office.onReady(async ({ host }) => {
       if (currentHost === Office.HostType.PowerPoint) {
         themeColors = await fetchThemeColors();
         updateColorSwatches();
+        startThemeRefresh(); // Start monitoring for theme changes
       }
 
       showScreen("main");
@@ -789,6 +854,8 @@ Office.onReady(async ({ host }) => {
   signoutBtn.addEventListener("click", async () => {
     try {
       await signOut();
+      stopThemeRefresh(); // Stop monitoring theme changes
+      themeColors = null;
       allIcons = [];
       iconGrid.innerHTML = "";
       activeCategory = "All";
@@ -893,6 +960,7 @@ Office.onReady(async ({ host }) => {
         updateDebugStatus("Fetching theme colors...");
         themeColors = await fetchThemeColors();
         updateColorSwatches();
+        startThemeRefresh(); // Start monitoring for theme changes
         updateDebugStatus("Theme colors loaded");
       }
 
@@ -918,6 +986,7 @@ Office.onReady(async ({ host }) => {
             updateDebugStatus("Fetching theme colors...");
             themeColors = await fetchThemeColors();
             updateColorSwatches();
+            startThemeRefresh(); // Start monitoring for theme changes
             updateDebugStatus("Theme colors loaded");
           }
 
