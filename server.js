@@ -398,6 +398,30 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
     return res.status(400).json({ error: "Missing required fields: id, name, category, svg" });
   }
 
+  // VALIDATE SVG CONTENT
+  // 1. Check viewBox is exactly "0 0 24 24"
+  const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/);
+  if (!viewBoxMatch) {
+    return res.status(400).json({ error: "SVG must have a viewBox attribute" });
+  }
+  if (viewBoxMatch[1] !== "0 0 24 24") {
+    return res.status(400).json({
+      error: `Invalid viewBox "${viewBoxMatch[1]}" - must be "0 0 24 24"`
+    });
+  }
+
+  // 2. Check for fill attributes (stroke-based icons only)
+  const fillMatches = svg.match(/fill=["']([^"']*)["']/g) || svg.match(/fill:\s*([^;}\s]+)/g);
+  const hasInvalidFill = fillMatches && fillMatches.some(match =>
+    !match.includes('none') && !match.includes('fill:none')
+  );
+
+  if (hasInvalidFill) {
+    return res.status(400).json({
+      error: "SVG contains fill attributes - only stroke-based icons allowed"
+    });
+  }
+
   try {
     const tenantId = req.user.tenantId;
 

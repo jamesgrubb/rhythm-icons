@@ -105,6 +105,8 @@ Office.onReady(async ({ host }) => {
     return new Promise((resolve) => {
       confirmTitle.textContent = title;
       confirmMessage.textContent = message;
+      confirmCancelBtn.style.display = 'block';
+      confirmOkBtn.textContent = 'Delete';
       confirmModal.classList.remove("hidden");
 
       const handleOk = () => {
@@ -123,6 +125,27 @@ Office.onReady(async ({ host }) => {
 
       confirmOkBtn.addEventListener("click", handleOk);
       confirmCancelBtn.addEventListener("click", handleCancel);
+    });
+  }
+
+  // Custom alert dialog (window.alert not supported in Office Add-ins)
+  function customAlert(message, title = "Notice") {
+    return new Promise((resolve) => {
+      confirmTitle.textContent = title;
+      confirmMessage.textContent = message;
+      confirmCancelBtn.style.display = 'none';
+      confirmOkBtn.textContent = 'OK';
+      confirmOkBtn.className = 'btn-primary'; // Change to primary style
+      confirmModal.classList.remove("hidden");
+
+      const handleOk = () => {
+        confirmModal.classList.add("hidden");
+        confirmOkBtn.className = 'btn-danger'; // Reset to danger style
+        confirmOkBtn.removeEventListener("click", handleOk);
+        resolve();
+      };
+
+      confirmOkBtn.addEventListener("click", handleOk);
     });
   }
 
@@ -831,12 +854,14 @@ Office.onReady(async ({ host }) => {
 
     const category = iconCategoryInput.value || "Custom";
     uploadedIcons = [];
+    const failedFiles = []; // Track validation failures
 
     for (const file of files) {
       console.log("[Upload] Processing:", file.name, "Type:", file.type, "Size:", file.size);
 
       if (!file.name.endsWith('.svg')) {
         console.log("[Upload] Skipping non-SVG file:", file.name);
+        failedFiles.push({ file: file.name, reason: "Not an SVG file" });
         continue;
       }
 
@@ -881,22 +906,43 @@ Office.onReady(async ({ host }) => {
           svgContent = svgContent.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
         }
 
-        // AUTO-FIX AND VALIDATE DESIGN SYSTEM STANDARDS
+        // STRICT VALIDATION - REJECT FILES THAT DON'T MEET STANDARDS
         const finalViewBoxMatch = svgContent.match(/viewBox=["']([^"']+)["']/);
         const strokeWidthMatch = svgContent.match(/stroke-width[:\s=]["']?([\d.]+)/);
         const hasStroke = svgContent.includes('stroke:') || svgContent.includes('stroke=');
 
-        // Validate viewBox
-        if (finalViewBoxMatch) {
-          const viewBox = finalViewBoxMatch[1];
-          const isStandardViewBox = viewBox === "0 0 24 24";
+        // Check for fill attributes (not allowed in stroke-based icon system)
+        const hasFillAttribute = /fill=["'][^"']*["']/.test(svgContent) || /fill:\s*[^;}\s]+/.test(svgContent);
+        const fillMatches = svgContent.match(/fill=["']([^"']*)["']/g) || svgContent.match(/fill:\s*([^;}\s]+)/g);
 
-          if (!isStandardViewBox) {
-            console.warn(`[Upload] ⚠️  "${iconName}": Non-standard viewBox "${viewBox}" (expected "0 0 24 24")`);
-          } else {
-            console.log(`[Upload] ✓ "${iconName}": Standard viewBox`);
-          }
+        // Filter out fill="none" which is acceptable
+        const hasInvalidFill = fillMatches && fillMatches.some(match =>
+          !match.includes('none') && !match.includes('fill:none')
+        );
+
+        // Validate viewBox is exactly 24x24
+        if (!finalViewBoxMatch) {
+          console.error(`[Upload] ✗ "${iconName}": Missing viewBox`);
+          failedFiles.push({ file: file.name, reason: "Missing viewBox attribute" });
+          continue;
         }
+
+        const viewBox = finalViewBoxMatch[1];
+        if (viewBox !== "0 0 24 24") {
+          console.error(`[Upload] ✗ "${iconName}": Invalid viewBox "${viewBox}" (must be "0 0 24 24")`);
+          failedFiles.push({ file: file.name, reason: `Invalid viewBox "${viewBox}" (must be "0 0 24 24")` });
+          continue;
+        }
+
+        // Validate no fill attributes (stroke-based icons only)
+        if (hasInvalidFill) {
+          console.error(`[Upload] ✗ "${iconName}": Contains fill attributes (stroke-based icons only)`);
+          failedFiles.push({ file: file.name, reason: "Contains fill attributes (use stroke-based icons only)" });
+          continue;
+        }
+
+        // Passed all validations
+        console.log(`[Upload] ✓ "${iconName}": Passed all validations`);
 
         // Auto-fix missing stroke-width
         if (hasStroke && !strokeWidthMatch) {
@@ -912,7 +958,7 @@ Office.onReady(async ({ host }) => {
           const isStandardStroke = strokeWidth >= 1.5 && strokeWidth <= 2.5;
 
           if (!isStandardStroke) {
-            console.warn(`[Upload] ⚠️  "${iconName}": Non-standard stroke-width ${strokeWidth}px (expected 2px to match PowerPoint 2pt)`);
+            console.warn(`[Upload] ⚠️  "${iconName}": Non-standard stroke-width ${strokeWidth}px (expected 2px)`);
           } else {
             console.log(`[Upload] ✓ "${iconName}": Standard stroke-width ${strokeWidth}px`);
           }
@@ -928,19 +974,35 @@ Office.onReady(async ({ host }) => {
         console.log("[Upload] ✓ Added icon:", iconName);
       } catch (err) {
         console.error("[Upload] ✗ Error reading file:", file.name, err);
+        failedFiles.push({ file: file.name, reason: err.message || "Error reading file" });
       }
     }
 
     console.log("[Upload] Total icons imported:", uploadedIcons.length);
+    console.log("[Upload] Failed files:", failedFiles.length);
+
+    // Show validation summary
+    if (failedFiles.length > 0) {
+      console.warn("[Upload] Failed files:", failedFiles);
+      const failedList = failedFiles.map(f => `• ${f.file}: ${f.reason}`).join('\n');
+      await customAlert(
+        `${failedFiles.length} file(s) failed validation:\n\n${failedList}\n\nRequired:\n✓ viewBox="0 0 24 24"\n✓ No fill attributes (stroke-based only)`,
+        'Validation Failed'
+      );
+    }
 
     if (uploadedIcons.length > 0) {
       console.log("[Upload] Calling renderPreview()...");
       renderPreview();
       console.log("[Upload] Showing preview section...");
       previewSection.classList.remove("hidden");
+
+      if (failedFiles.length > 0) {
+        showToast(`${uploadedIcons.length} passed, ${failedFiles.length} failed validation`);
+      }
     } else {
       console.log("[Upload] No valid SVG files found");
-      showToast("No valid SVG files found");
+      showToast("No valid SVG files - check requirements");
     }
   });
 
