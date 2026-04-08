@@ -518,6 +518,7 @@ Office.onReady(async ({ host }) => {
   }
 
   // ---- Fetch PowerPoint theme colors ----
+  let isFirstThemeFetch = true; // Flag to reduce console spam
   async function fetchThemeColors() {
     // Fallback colors (Office default theme)
     const fallbackColors = {
@@ -534,23 +535,33 @@ Office.onReady(async ({ host }) => {
     };
 
     if (currentHost !== Office.HostType.PowerPoint) {
-      console.log("[Theme] Not PowerPoint, using fallback colors");
+      if (isFirstThemeFetch) {
+        console.log("[Theme] Not PowerPoint, using fallback colors");
+      }
       return fallbackColors;
     }
 
     try {
-      console.log("[Theme] Attempting to fetch PowerPoint theme colors...");
-      console.log("[Theme] PowerPoint.js available:", typeof PowerPoint !== 'undefined');
-      console.log("[Theme] Office.context.requirements available:", typeof Office.context.requirements !== 'undefined');
+      // Only log verbose details on first fetch
+      if (isFirstThemeFetch) {
+        console.log("[Theme] Attempting to fetch PowerPoint theme colors...");
+        console.log("[Theme] PowerPoint.js available:", typeof PowerPoint !== 'undefined');
+        console.log("[Theme] Office.context.requirements available:", typeof Office.context.requirements !== 'undefined');
+      }
 
       // Check if PowerPointApi 1.10 is supported
       if (Office.context.requirements && Office.context.requirements.isSetSupported) {
         const isPptApi110Supported = Office.context.requirements.isSetSupported('PowerPointApi', '1.10');
-        console.log("[Theme] PowerPointApi 1.10 supported:", isPptApi110Supported);
+
+        if (isFirstThemeFetch) {
+          console.log("[Theme] PowerPointApi 1.10 supported:", isPptApi110Supported);
+        }
 
         if (!isPptApi110Supported) {
-          console.warn("[Theme] PowerPointApi 1.10 not supported - theme color API unavailable");
-          console.warn("[Theme] Your PowerPoint version may be too old. Update to latest version.");
+          if (isFirstThemeFetch) {
+            console.warn("[Theme] PowerPointApi 1.10 not supported - theme color API unavailable");
+            console.warn("[Theme] Your PowerPoint version may be too old. Update to latest version.");
+          }
           return fallbackColors;
         }
       }
@@ -560,17 +571,23 @@ Office.onReady(async ({ host }) => {
         masters.load("items");
         await context.sync();
 
-        console.log("[Theme] Slide masters count:", masters.items.length);
+        if (isFirstThemeFetch) {
+          console.log("[Theme] Slide masters count:", masters.items.length);
+        }
 
         if (masters.items.length === 0) {
-          console.warn("[Theme] No slide masters found, using fallback");
+          if (isFirstThemeFetch) {
+            console.warn("[Theme] No slide masters found, using fallback");
+          }
           return fallbackColors;
         }
 
         const scheme = masters.items[0].themeColorScheme;
         await context.sync(); // Sync after accessing themeColorScheme
 
-        console.log("[Theme] Theme color scheme object:", scheme ? "available" : "null");
+        if (isFirstThemeFetch) {
+          console.log("[Theme] Theme color scheme object:", scheme ? "available" : "null");
+        }
 
         const colors = {};
 
@@ -594,20 +611,29 @@ Office.onReady(async ({ host }) => {
             const color = scheme.getThemeColor(enumValue);
             await context.sync();
             colors[name] = color.value;
-            console.log(`[Theme] ✓ ${name}: ${color.value}`);
+            if (isFirstThemeFetch) {
+              console.log(`[Theme] ✓ ${name}: ${color.value}`);
+            }
           } catch (err) {
-            console.error(`[Theme] ✗ Failed to get ${name}:`, err.message, err.code);
+            if (isFirstThemeFetch) {
+              console.error(`[Theme] ✗ Failed to get ${name}:`, err.message, err.code);
+            }
             colors[name] = fallbackColors[name];
           }
         }
 
-        console.log("[Theme] Successfully fetched theme colors:", colors);
+        if (isFirstThemeFetch) {
+          console.log("[Theme] Successfully fetched theme colors:", colors);
+          isFirstThemeFetch = false; // Disable verbose logging after first fetch
+        }
         return colors;
       });
     } catch (error) {
-      console.error("[Theme] API failed:", error);
-      console.error("[Theme] Error name:", error.name);
-      console.error("[Theme] Error code:", error.code);
+      if (isFirstThemeFetch) {
+        console.error("[Theme] API failed:", error);
+        console.error("[Theme] Error name:", error.name);
+        console.error("[Theme] Error code:", error.code);
+      }
       console.error("[Theme] Error message:", error.message);
       if (error.debugInfo) {
         console.error("[Theme] Debug info:", JSON.stringify(error.debugInfo, null, 2));
