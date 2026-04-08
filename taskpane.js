@@ -235,9 +235,12 @@ Office.onReady(async ({ host }) => {
       const replaceBtn = document.getElementById("duplicate-replace");
 
       // Set content
-      const { uploaded, existing, isVersioned } = duplicateInfo;
+      const { uploaded, existing, isVersioned, isExactMatch } = duplicateInfo;
 
-      if (isVersioned) {
+      if (isExactMatch) {
+        title.textContent = "Icon Already Exists";
+        message.textContent = `An icon named "${existing.name}" already exists. What would you like to do?`;
+      } else if (isVersioned) {
         title.textContent = "Icon Version Detected";
         message.textContent = `You're uploading "${uploaded.name}" but "${existing.name}" already exists. What would you like to do?`;
       } else {
@@ -270,7 +273,7 @@ Office.onReady(async ({ host }) => {
         resolve({ action: "skip" });
       };
 
-      const onAddNew = () => {
+      const onAddNew = async () => {
         // If rename input is hidden, show it and wait for user to enter name
         if (renameInput.classList.contains("hidden")) {
           renameInput.classList.remove("hidden");
@@ -282,9 +285,10 @@ Office.onReady(async ({ host }) => {
           const newNameValue = renameInput.value.trim();
           if (!newNameValue) {
             // Use customAlert instead of alert
-            customAlert("Please enter a name for the new icon.", "Invalid Name");
+            await customAlert("Please enter a name for the new icon.", "Invalid Name");
             return;
           }
+          console.log("[Upload] Add New confirmed with name:", newNameValue);
           cleanup();
           resolve({ action: "addNew", newName: newNameValue });
         }
@@ -1502,18 +1506,24 @@ Office.onReady(async ({ host }) => {
     const duplicates = [];
 
     uploadedIcons.forEach(uploaded => {
-      const baseId = getBaseIconId(uploaded.id);
+      // First priority: Check for EXACT ID match
+      let existing = existingIcons.find(icon => icon.id === uploaded.id);
+      let isExactMatch = !!existing;
 
-      // Check if base icon exists
-      const existing = existingIcons.find(icon => icon.id === baseId);
+      // Second priority: If no exact match, check for base icon (strip version suffix)
+      if (!existing) {
+        const baseId = getBaseIconId(uploaded.id);
+        existing = existingIcons.find(icon => icon.id === baseId);
+      }
 
       if (existing) {
         duplicates.push({
           uploaded: uploaded,
           existing: existing,
-          baseId: baseId,
+          baseId: existing.id,
           isVersioned: hasVersionSuffix(uploaded.id),
-          versionNumber: getVersionNumber(uploaded.id)
+          versionNumber: getVersionNumber(uploaded.id),
+          isExactMatch: isExactMatch // Flag to indicate if it's exact duplicate or version variant
         });
       }
     });
@@ -1823,10 +1833,14 @@ Office.onReady(async ({ host }) => {
               .replace(/[^a-z0-9]+/g, '-');
             iconToUpload.id = newId;
             iconToUpload.name = decision.newName;
+            console.log(`[Upload] New icon will be: id="${newId}", name="${decision.newName}"`);
           } else if (decision.action === "replace") {
             console.log(`[Upload] Replacing: ${icon._duplicateInfo.existing.name}`);
             // Use existing icon's ID to trigger UPSERT update
+            // Keep the existing icon's name and ID
             iconToUpload.id = icon._duplicateInfo.existing.id;
+            iconToUpload.name = icon._duplicateInfo.existing.name;
+            console.log(`[Upload] Replace will use: id="${iconToUpload.id}", name="${iconToUpload.name}"`);
           }
         }
 
@@ -1840,6 +1854,8 @@ Office.onReady(async ({ host }) => {
             client_id: client_id
           };
 
+          console.log(`[Upload] Sending to API:`, { id: payload.id, name: payload.name, category: payload.category });
+
           const res = await fetch(`${ICON_API_BASE}/icons`, {
             method: 'POST',
             headers: {
@@ -1851,6 +1867,7 @@ Office.onReady(async ({ host }) => {
 
           if (res.ok) {
             const result = await res.json();
+            console.log(`[Upload] API response for ${iconToUpload.name}:`, result);
             if (result.action === 'created') {
               createdCount++;
             } else if (result.action === 'updated') {
