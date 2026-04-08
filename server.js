@@ -446,22 +446,28 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
       return res.status(403).json({ error: "No tenant found for user" });
     }
 
-    await pool.query(
+    const result = await pool.query(
       `INSERT INTO icons (tenant_id, icon_id, name, category, svg, client_id)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (tenant_id, icon_id)
+       DO UPDATE SET
+         name = EXCLUDED.name,
+         category = EXCLUDED.category,
+         svg = EXCLUDED.svg,
+         client_id = EXCLUDED.client_id,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING (xmax = 0) AS inserted`,
       [tenantId, id, name, category, svg, client_id || null]
     );
 
-    console.log('[API] Icon created by admin:', req.user.email, '- Icon ID:', id, '- Client ID:', client_id || 'none');
-    res.status(201).json({ ok: true, id });
+    const wasInserted = result.rows[0].inserted;
+    const action = wasInserted ? 'created' : 'updated';
+
+    console.log(`[API] Icon ${action} by admin:`, req.user.email, '- Icon ID:', id, '- Client ID:', client_id || 'none');
+    res.status(wasInserted ? 201 : 200).json({ ok: true, id, action });
   } catch (error) {
-    console.error('[API] Error creating icon:', error);
-
-    if (error.code === '23505') { // Unique constraint violation
-      return res.status(409).json({ error: "Icon ID already exists for this tenant" });
-    }
-
-    res.status(500).json({ error: "Failed to create icon" });
+    console.error('[API] Error creating/updating icon:', error);
+    res.status(500).json({ error: "Failed to create/update icon" });
   }
 });
 

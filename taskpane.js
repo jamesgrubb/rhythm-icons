@@ -1450,7 +1450,9 @@ Office.onReady(async ({ host }) => {
 
     try {
       const token = await getAccessToken();
-      let successCount = 0;
+      let createdCount = 0;
+      let updatedCount = 0;
+      let failedCount = 0;
 
       // Debug: Log the selected client
       console.log('[Upload] Client dropdown value:', iconClientSelect.value);
@@ -1479,20 +1481,32 @@ Office.onReady(async ({ host }) => {
           });
 
           if (res.ok) {
-            successCount++;
+            const result = await res.json();
+            if (result.action === 'created') {
+              createdCount++;
+            } else if (result.action === 'updated') {
+              updatedCount++;
+            }
           } else {
             const error = await res.json();
             console.error('[Upload] Failed:', icon.name, error);
+            failedCount++;
           }
         } catch (err) {
           console.error('[Upload] Failed:', icon.name, err);
+          failedCount++;
         }
       }
 
       // Reload icons from API to get updated list
       await loadIcons(token);
 
-      showToast(`Uploaded ${successCount} of ${uploadedIcons.length} icons`);
+      // Show detailed result message
+      const parts = [];
+      if (createdCount > 0) parts.push(`${createdCount} created`);
+      if (updatedCount > 0) parts.push(`${updatedCount} updated`);
+      if (failedCount > 0) parts.push(`${failedCount} failed`);
+      showToast(parts.join(', '));
 
       // Close modal and reset
       uploadModal.classList.add("hidden");
