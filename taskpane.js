@@ -278,15 +278,29 @@ Office.onReady(async ({ host }) => {
         addNewBtn.removeEventListener("click", onAddNew);
         replaceBtn.removeEventListener("click", onReplace);
         renameInput.removeEventListener("input", onInputChange);
-        // Reset button text and hint
+        // Reset button text, visibility, and hint
         addNewBtn.textContent = "Add New";
+        skipBtn.textContent = "Skip";
+        skipBtn.style.display = "block";
+        replaceBtn.style.display = "block";
         hintText.classList.add("hidden");
         hintText.classList.remove("warning");
       };
 
       const onSkip = () => {
-        cleanup();
-        resolve({ action: "skip" });
+        // If in rename mode (input visible), treat as cancel and go back
+        if (!renameInput.classList.contains("hidden")) {
+          renameInput.classList.add("hidden");
+          hintText.classList.add("hidden");
+          skipBtn.style.display = "block";
+          replaceBtn.style.display = "block";
+          addNewBtn.textContent = "Add New";
+          skipBtn.textContent = "Skip";
+        } else {
+          // Normal skip behavior
+          cleanup();
+          resolve({ action: "skip" });
+        }
       };
 
       // Validate input and show warnings for version suffixes
@@ -310,12 +324,21 @@ Office.onReady(async ({ host }) => {
       const onAddNew = async () => {
         // If rename input is hidden, show it and wait for user to enter name
         if (renameInput.classList.contains("hidden")) {
+          // Enter rename mode: hide other action buttons
           renameInput.classList.remove("hidden");
           hintText.classList.remove("hidden");
           renameInput.focus();
           renameInput.value = uploaded.name;
           renameInput.addEventListener("input", onInputChange);
-          addNewBtn.textContent = "Confirm New Name";
+
+          // Hide other buttons to avoid confusion
+          skipBtn.style.display = "none";
+          replaceBtn.style.display = "none";
+
+          // Change button to show cancel option
+          addNewBtn.textContent = "Confirm";
+          skipBtn.textContent = "Cancel";
+          skipBtn.style.display = "block";
         } else {
           // User confirmed new name
           const newNameValue = renameInput.value.trim();
