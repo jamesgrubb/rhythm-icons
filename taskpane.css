@@ -654,6 +654,25 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   transform: scale(0.98);
 }
 
+/* Confirm input field (for prompt dialogs) */
+.confirm-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  margin-bottom: 12px;
+}
+
+.confirm-input:focus {
+  border-color: var(--border-2);
+}
+
 /* ---- UPLOAD MODAL ---- */
 .modal {
   position: fixed;

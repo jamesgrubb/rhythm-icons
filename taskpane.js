@@ -64,6 +64,7 @@ Office.onReady(async ({ host }) => {
   const confirmModal         = document.getElementById("confirm-modal");
   const confirmTitle         = document.getElementById("confirm-title");
   const confirmMessage       = document.getElementById("confirm-message");
+  const confirmInput         = document.getElementById("confirm-input");
   const confirmOkBtn         = document.getElementById("confirm-ok");
   const confirmCancelBtn     = document.getElementById("confirm-cancel");
   const iconClientSelect     = document.getElementById("icon-client");
@@ -112,6 +113,7 @@ Office.onReady(async ({ host }) => {
     return new Promise((resolve) => {
       confirmTitle.textContent = title;
       confirmMessage.textContent = message;
+      confirmInput.classList.add("hidden");
       confirmCancelBtn.style.display = 'block';
       confirmOkBtn.textContent = 'Delete';
       confirmModal.classList.remove("hidden");
@@ -140,6 +142,7 @@ Office.onReady(async ({ host }) => {
     return new Promise((resolve) => {
       confirmTitle.textContent = title;
       confirmMessage.textContent = message;
+      confirmInput.classList.add("hidden");
       confirmCancelBtn.style.display = 'none';
       confirmOkBtn.textContent = 'OK';
       confirmOkBtn.className = 'btn-primary'; // Change to primary style
@@ -153,6 +156,61 @@ Office.onReady(async ({ host }) => {
       };
 
       confirmOkBtn.addEventListener("click", handleOk);
+    });
+  }
+
+  // Custom prompt dialog (window.prompt not supported in Office Add-ins)
+  function customPrompt(message, title = "Enter Value", defaultValue = "") {
+    return new Promise((resolve) => {
+      confirmTitle.textContent = title;
+      confirmMessage.textContent = message;
+      confirmInput.value = defaultValue;
+      confirmInput.classList.remove("hidden");
+      confirmCancelBtn.style.display = 'block';
+      confirmOkBtn.textContent = 'OK';
+      confirmOkBtn.className = 'btn-primary';
+      confirmModal.classList.remove("hidden");
+
+      // Focus input after a short delay (for rendering)
+      setTimeout(() => {
+        confirmInput.focus();
+        confirmInput.select();
+      }, 100);
+
+      const handleOk = () => {
+        const value = confirmInput.value.trim();
+        confirmModal.classList.add("hidden");
+        confirmInput.classList.add("hidden");
+        confirmOkBtn.className = 'btn-danger';
+        confirmOkBtn.removeEventListener("click", handleOk);
+        confirmCancelBtn.removeEventListener("click", handleCancel);
+        confirmInput.removeEventListener("keydown", handleKeydown);
+        resolve(value || null);
+      };
+
+      const handleCancel = () => {
+        confirmModal.classList.add("hidden");
+        confirmInput.classList.add("hidden");
+        confirmOkBtn.className = 'btn-danger';
+        confirmOkBtn.removeEventListener("click", handleOk);
+        confirmCancelBtn.removeEventListener("click", handleCancel);
+        confirmInput.removeEventListener("keydown", handleKeydown);
+        resolve(null);
+      };
+
+      const handleKeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleOk();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          handleCancel();
+        }
+      };
+
+      confirmOkBtn.addEventListener("click", handleOk);
+      confirmCancelBtn.addEventListener("click", handleCancel);
+      confirmInput.addEventListener("keydown", handleKeydown);
     });
   }
 
@@ -1114,7 +1172,7 @@ Office.onReady(async ({ host }) => {
   }
 
   async function addNewClient() {
-    const clientName = prompt('Enter new client name:');
+    const clientName = await customPrompt('Enter the client name:', 'New Client');
     if (!clientName || !clientName.trim()) return;
 
     try {
