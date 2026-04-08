@@ -1909,7 +1909,7 @@ Office.onReady(async ({ host }) => {
     if (uploadedIcons.length === 0) return;
 
     const category = iconCategoryInput.value.trim() || "Custom";
-    const client_id = iconClientSelect.value || null;
+    const selectedClientId = iconClientSelect.value || null;
 
     copyCodeBtn.disabled = true;
     copyCodeBtn.textContent = "Uploading...";
@@ -1924,6 +1924,7 @@ Office.onReady(async ({ host }) => {
       for (const icon of uploadedIcons) {
         let iconToUpload = { ...icon, category };
         let shouldUpload = true;
+        let isUpdate = false;
 
         console.log(`[Upload] Processing icon: ${icon.name}, isDuplicate: ${icon._isDuplicate}`);
 
@@ -1942,6 +1943,7 @@ Office.onReady(async ({ host }) => {
             console.log(`[Upload] Replacing: ${icon._duplicateInfo.existing.name}`);
             // Use existing icon's ID to trigger UPSERT update
             iconToUpload.id = icon._duplicateInfo.existing.id;
+            isUpdate = true;
 
             // If user provided a new name during replace, use it; otherwise keep existing name
             if (decision.newName) {
@@ -1956,12 +1958,24 @@ Office.onReady(async ({ host }) => {
 
         // Upload icon if not skipped
         if (shouldUpload) {
+          // Determine client_id to send
+          let clientIdToSend;
+          if (isUpdate && !selectedClientId) {
+            // Preserve existing client_id when updating and no client selected in dropdown
+            clientIdToSend = icon._duplicateInfo.existing.client_id || null;
+            console.log(`[Upload] Preserving existing client_id: ${clientIdToSend}`);
+          } else {
+            // Use selected client_id for new icons or when explicitly changed
+            clientIdToSend = selectedClientId;
+            console.log(`[Upload] Using selected client_id: ${clientIdToSend}`);
+          }
+
           const payload = {
             id: iconToUpload.id,
             name: iconToUpload.name,
             category: iconToUpload.category,
             svg: iconToUpload.svg,
-            client_id: client_id
+            client_id: clientIdToSend
           };
 
           console.log(`[Upload] Sending to API:`, { id: payload.id, name: payload.name, category: payload.category });
