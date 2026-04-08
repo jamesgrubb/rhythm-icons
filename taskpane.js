@@ -51,6 +51,10 @@ Office.onReady(async ({ host }) => {
   const colorBtns            = document.querySelectorAll(".color-btn");
   const circleBackgroundToggle = document.getElementById("circle-background-toggle");
   const fillToggle           = document.getElementById("fill-toggle");
+  const mixedStrokeToggle    = document.getElementById("mixed-stroke-toggle");
+  const mixedStrokeColors    = document.getElementById("mixed-stroke-colors");
+  const mixedColor1Select    = document.getElementById("mixed-color-1");
+  const mixedColor2Select    = document.getElementById("mixed-color-2");
   const uploadBtn            = document.getElementById("upload-btn");
   const editModeBtn          = document.getElementById("edit-mode-btn");
   const uploadModal          = document.getElementById("upload-modal");
@@ -78,6 +82,9 @@ Office.onReady(async ({ host }) => {
   let selectedColor  = "Accent1";  // PowerPoint theme color
   let circleBackground = false;  // Add circle background to icons
   let fillMode       = false;  // Use fill instead of stroke
+  let mixedStroke    = false;  // Use multiple colors (randomly assigned)
+  let mixedColor1    = "Accent1";  // First color for mixed stroke
+  let mixedColor2    = "Accent2";  // Second color for mixed stroke
   let uploadedIcons  = [];  // Temporary storage for bulk uploaded icons
   let toastTimer     = null;
   let currentUserRole = null;  // 'admin', 'user', 'viewer'
@@ -682,13 +689,31 @@ Office.onReady(async ({ host }) => {
       modifiedContent = modifiedContent.replace(/fill="[^"]*"/g, 'fill="none"');
 
       // Add theme class to all shape elements
-      modifiedContent = modifiedContent.replace(/<path /g, `<path class="${strokeClass}" `);
-      modifiedContent = modifiedContent.replace(/<line /g, `<line class="${strokeClass}" `);
-      modifiedContent = modifiedContent.replace(/<polyline /g, `<polyline class="${strokeClass}" `);
-      modifiedContent = modifiedContent.replace(/<circle /g, `<circle class="${strokeClass}" `);
-      modifiedContent = modifiedContent.replace(/<rect /g, `<rect class="${strokeClass}" `);
-      modifiedContent = modifiedContent.replace(/<polygon /g, `<polygon class="${strokeClass}" `);
-      modifiedContent = modifiedContent.replace(/<ellipse /g, `<ellipse class="${strokeClass}" `);
+      if (mixedStroke) {
+        // Mixed stroke mode: Randomly assign selected colors to each element
+        const applyMixedColor = () => {
+          const randomColor = Math.random() < 0.5 ? mixedColor1 : mixedColor2;
+          return `MsftOfcThm_${randomColor}_Stroke_v2`;
+        };
+
+        // Replace each element individually with random color
+        modifiedContent = modifiedContent.replace(/<path /g, () => `<path class="${applyMixedColor()}" `);
+        modifiedContent = modifiedContent.replace(/<line /g, () => `<line class="${applyMixedColor()}" `);
+        modifiedContent = modifiedContent.replace(/<polyline /g, () => `<polyline class="${applyMixedColor()}" `);
+        modifiedContent = modifiedContent.replace(/<circle /g, () => `<circle class="${applyMixedColor()}" `);
+        modifiedContent = modifiedContent.replace(/<rect /g, () => `<rect class="${applyMixedColor()}" `);
+        modifiedContent = modifiedContent.replace(/<polygon /g, () => `<polygon class="${applyMixedColor()}" `);
+        modifiedContent = modifiedContent.replace(/<ellipse /g, () => `<ellipse class="${applyMixedColor()}" `);
+      } else {
+        // Single color mode: Apply selected theme color to all elements
+        modifiedContent = modifiedContent.replace(/<path /g, `<path class="${strokeClass}" `);
+        modifiedContent = modifiedContent.replace(/<line /g, `<line class="${strokeClass}" `);
+        modifiedContent = modifiedContent.replace(/<polyline /g, `<polyline class="${strokeClass}" `);
+        modifiedContent = modifiedContent.replace(/<circle /g, `<circle class="${strokeClass}" `);
+        modifiedContent = modifiedContent.replace(/<rect /g, `<rect class="${strokeClass}" `);
+        modifiedContent = modifiedContent.replace(/<polygon /g, `<polygon class="${strokeClass}" `);
+        modifiedContent = modifiedContent.replace(/<ellipse /g, `<ellipse class="${strokeClass}" `);
+      }
 
       // Extract original viewBox from the source SVG
       const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/);
@@ -710,9 +735,48 @@ Office.onReady(async ({ host }) => {
            <circle cx="${cx}" cy="${cy}" r="${radius}" class="${themeClass}_Fill_v2" opacity="0.35" />`;
       }
 
+      // Fallback colors for all theme options
+      const fallbackColors = {
+        "Accent1": "#4472C4",
+        "Accent2": "#ED7D31",
+        "Accent3": "#A5A5A5",
+        "Accent4": "#FFC000",
+        "Accent5": "#5B9BD5",
+        "Accent6": "#70AD47",
+        "Text1": "#000000",
+        "Text2": "#444444",
+        "Background1": "#FFFFFF",
+        "Background2": "#F5F5F5"
+      };
+
       // Build SVG with theme styles including extracted properties
-      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="${viewBox}">
-        <style>
+      let styleBlock = '';
+      if (mixedStroke) {
+        // Define both selected color stroke classes
+        const color1Value = themeColors ? themeColors[mixedColor1] : fallbackColors[mixedColor1];
+        const color2Value = themeColors ? themeColors[mixedColor2] : fallbackColors[mixedColor2];
+
+        styleBlock = `
+          .MsftOfcThm_${mixedColor1}_Stroke_v2 {
+            stroke: ${color1Value};
+            fill: none !important;
+            stroke-width: ${adjustedStrokeWidth};
+            stroke-linecap: ${strokeLinecap};
+            stroke-linejoin: ${strokeLinejoin};
+          }
+          .MsftOfcThm_${mixedColor2}_Stroke_v2 {
+            stroke: ${color2Value};
+            fill: none !important;
+            stroke-width: ${adjustedStrokeWidth};
+            stroke-linecap: ${strokeLinecap};
+            stroke-linejoin: ${strokeLinejoin};
+          }
+          .MsftOfcThm_${mixedColor1}_Fill_v2 { fill: ${color1Value}; }
+          .MsftOfcThm_${mixedColor2}_Fill_v2 { fill: ${color2Value}; }
+          .MsftOfcThm_Background2_Fill_v2 { fill: ${themeColors ? themeColors.Background2 : "#F5F5F5"}; }`;
+      } else {
+        // Single color mode
+        styleBlock = `
           .${strokeClass} {
             stroke: ${fallbackColor};
             fill: none !important;
@@ -721,8 +785,11 @@ Office.onReady(async ({ host }) => {
             stroke-linejoin: ${strokeLinejoin};
           }
           .${themeClass}_Fill_v2 { fill: ${fallbackColor}; }
-          .MsftOfcThm_Background2_Fill_v2 { fill: #F5F5F5; }
-        </style>
+          .MsftOfcThm_Background2_Fill_v2 { fill: #F5F5F5; }`;
+      }
+
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="${viewBox}">
+        <style>${styleBlock}</style>
         ${backgroundCircle}
         ${modifiedContent}
       </svg>`;
@@ -942,6 +1009,27 @@ Office.onReady(async ({ host }) => {
   fillToggle.addEventListener("change", () => {
     fillMode = fillToggle.checked;
     console.log("[Fill] Fill mode:", fillMode);
+  });
+
+  // ---- Mixed stroke toggle ----
+  mixedStrokeToggle.addEventListener("change", () => {
+    mixedStroke = mixedStrokeToggle.checked;
+
+    // Show/hide color selector UI
+    mixedStrokeColors.classList.toggle("hidden", !mixedStroke);
+
+    console.log("[MixedStroke] Mixed stroke mode:", mixedStroke);
+  });
+
+  // ---- Mixed stroke color selectors ----
+  mixedColor1Select.addEventListener("change", () => {
+    mixedColor1 = mixedColor1Select.value;
+    console.log("[MixedStroke] Color 1 changed to:", mixedColor1);
+  });
+
+  mixedColor2Select.addEventListener("change", () => {
+    mixedColor2 = mixedColor2Select.value;
+    console.log("[MixedStroke] Color 2 changed to:", mixedColor2);
   });
 
   // ---- Sign-in ----

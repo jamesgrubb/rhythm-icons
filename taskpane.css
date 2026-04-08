@@ -507,11 +507,74 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   color: var(--text);
 }
 #circle-background-toggle,
-#fill-toggle {
+#fill-toggle,
+#mixed-stroke-toggle {
   width: 14px;
   height: 14px;
   cursor: pointer;
   accent-color: var(--accent);
+}
+
+/* ---- MIXED STROKE COLOR SELECTOR ---- */
+.mixed-stroke-colors {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+  transition: all 0.2s ease;
+}
+
+.mixed-stroke-colors.hidden {
+  display: none;
+}
+
+.mixed-stroke-label {
+  font-size: 11px;
+  color: var(--text-3);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.color-selector-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.color-select {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.color-select:hover {
+  background: var(--bg-3);
+  border-color: var(--border-2);
+}
+
+.color-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(68, 114, 196, 0.1);
+}
+
+.color-separator {
+  font-size: 12px;
+  color: var(--text-3);
+  font-weight: 600;
 }
 
 /* ---- ICON GRID ---- */
