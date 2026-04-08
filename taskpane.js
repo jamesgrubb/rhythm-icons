@@ -1048,12 +1048,6 @@ Office.onReady(async ({ host }) => {
     const categories = getCategories(allIcons);
     const clients = getClients(allIcons);
 
-    // Debug: Log client information
-    console.log('[LoadIcons] Total icons:', allIcons.length);
-    console.log('[LoadIcons] Icons with client_name:', allIcons.filter(i => i.client_name).length);
-    console.log('[LoadIcons] Unique clients:', clients);
-    console.log('[LoadIcons] Sample icons:', allIcons.slice(0, 3).map(i => ({ name: i.name, client_id: i.client_id, client_name: i.client_name })));
-
     renderTabs(categories);
     renderClientTabs(clients);
     renderGrid();
@@ -1155,7 +1149,6 @@ Office.onReady(async ({ host }) => {
       }
 
       allClients = await res.json();
-      console.log('[Clients] Fetched clients:', allClients);
       populateClientSelect();
     } catch (error) {
       console.error('[Clients] Error fetching:', error);
@@ -1454,11 +1447,6 @@ Office.onReady(async ({ host }) => {
       let updatedCount = 0;
       let failedCount = 0;
 
-      // Debug: Log the selected client
-      console.log('[Upload] Client dropdown value:', iconClientSelect.value);
-      console.log('[Upload] Client dropdown selected index:', iconClientSelect.selectedIndex);
-      console.log('[Upload] Client dropdown options:', Array.from(iconClientSelect.options).map(o => ({ value: o.value, text: o.text, selected: o.selected })));
-
       for (const icon of uploadedIcons) {
         try {
           const payload = {
@@ -1468,8 +1456,6 @@ Office.onReady(async ({ host }) => {
             svg: icon.svg,
             client_id: iconClientSelect.value || null
           };
-
-          console.log(`[Upload] Uploading "${icon.name}" with client_id:`, payload.client_id);
 
           const res = await fetch(`${ICON_API_BASE}/icons`, {
             method: 'POST',

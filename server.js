@@ -401,16 +401,6 @@ app.get("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
 app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
   const { id, name, category, svg, client_id } = req.body;
 
-  console.log('[API] POST /api/icons - Request body:', {
-    id,
-    name,
-    category,
-    svg_length: svg?.length,
-    client_id,
-    client_id_type: typeof client_id,
-    client_id_is_empty_string: client_id === ''
-  });
-
   if (!id || !name || !category || !svg) {
     return res.status(400).json({ error: "Missing required fields: id, name, category, svg" });
   }
