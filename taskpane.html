@@ -367,6 +367,39 @@
       </div>
     </div>
 
+    <!-- EDIT ICON MODAL -->
+    <div id="edit-icon-modal" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <h3>Edit Icon</h3>
+        <div class="edit-icon-preview">
+          <div id="edit-icon-svg"></div>
+          <p id="edit-icon-id" class="edit-icon-id"></p>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-icon-name">Icon Name</label>
+          <input type="text" id="edit-icon-name" class="confirm-input" placeholder="Icon name..." />
+        </div>
+
+        <div class="form-group">
+          <label for="edit-icon-category">Category</label>
+          <input type="text" id="edit-icon-category" class="confirm-input" placeholder="Category..." />
+        </div>
+
+        <div class="form-group">
+          <label for="edit-icon-client">Client</label>
+          <select id="edit-icon-client" class="confirm-input">
+            <option value="">No client</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button id="edit-icon-cancel" class="btn-secondary">Cancel</button>
+          <button id="edit-icon-save" class="btn-primary">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
     <!-- LOADING OVERLAY -->
     <div id="loading-overlay" class="screen active">
       <div class="loader-wrap">

@@ -685,6 +685,45 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   cursor: default;
 }
 
+/* ---- ICON EDIT BUTTON (ADMIN ONLY) ---- */
+.icon-edit-btn {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.12s var(--ease), opacity 0.12s;
+  opacity: 0.9;
+  z-index: 10;
+}
+
+.icon-edit-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.icon-edit-btn:active {
+  transform: scale(0.95);
+}
+
+.icon-card:hover .icon-edit-btn {
+  display: flex;
+}
+
+/* In edit mode, show edit buttons persistently (no hover needed) */
+.edit-mode .icon-edit-btn {
+  display: flex;
+}
+
 /* ---- EMPTY STATE ---- */
 .empty-state {
   display: flex;
@@ -915,6 +954,73 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 .duplicate-hint.warning {
   border-left-color: #FFC000;
   color: #FFC000;
+}
+
+/* ---- EDIT ICON MODAL ---- */
+.edit-icon-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+#edit-icon-svg {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+#edit-icon-svg svg {
+  width: 64px;
+  height: 64px;
+  stroke: var(--text-2);
+}
+
+.edit-icon-id {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: 'Courier New', monospace;
+  margin: 0;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--text-1);
+  transition: border-color 0.15s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 /* ---- UPLOAD MODAL ---- */

@@ -574,7 +574,7 @@ app.delete("/api/clients/:id", requireAuth, ensureTenantExists, extractUserRole,
 // PUT /api/icons/:id — update an existing icon (admin only)
 app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
   const { id } = req.params;
-  const { name, category, svg, is_public } = req.body;
+  const { name, category, svg, is_public, client_id } = req.body;
   const tenantId = req.user.tenantId;
 
   try {
@@ -589,17 +589,20 @@ app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
     }
 
     // Update icon (only provided fields)
+    // Note: We use COALESCE for optional fields, but explicitly set client_id even if null
     await pool.query(
       `UPDATE icons
        SET name = COALESCE($1, name),
            category = COALESCE($2, category),
            svg = COALESCE($3, svg),
            is_public = COALESCE($4, is_public),
+           client_id = $5,
            updated_at = NOW()
-       WHERE icon_id = $5 AND tenant_id = $6`,
-      [name, category, svg, is_public, id, tenantId]
+       WHERE icon_id = $6 AND tenant_id = $7`,
+      [name, category, svg, is_public, client_id !== undefined ? client_id : null, id, tenantId]
     );
 
+    console.log(`[API] Icon updated: ${id} - Client ID: ${client_id || 'none'}`);
     res.json({ ok: true, message: 'Icon updated successfully' });
   } catch (error) {
     console.error('[API] Error updating icon:', error);

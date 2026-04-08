@@ -509,10 +509,22 @@ Office.onReady(async ({ host }) => {
 
       card.innerHTML = `${thumbnailSvg}<span class="icon-name">${icon.name}</span>`;
 
-      // Add delete button in edit mode for admins on their own tenant's icons
+      // Add edit and delete buttons in edit mode for admins on their own tenant's icons
       if (isEditMode && currentUserRole === 'admin' && currentUserProfile) {
         const isOwnIcon = !icon.tenant_name || icon.tenant_name === currentUserProfile.tenant.name;
         if (isOwnIcon) {
+          // Edit button
+          const editBtn = document.createElement("button");
+          editBtn.className = "icon-edit-btn";
+          editBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+          editBtn.title = "Edit icon";
+          editBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            editIcon(icon);
+          });
+          card.appendChild(editBtn);
+
+          // Delete button
           const deleteBtn = document.createElement("button");
           deleteBtn.className = "icon-delete-btn";
           deleteBtn.innerHTML = "&times;";
@@ -576,6 +588,111 @@ Office.onReady(async ({ host }) => {
       console.error('[Delete] Error:', error);
       showToast(`Error: ${error.message}`);
     }
+  }
+
+  // ---- Edit icon (admin only) ----
+  async function editIcon(icon) {
+    if (currentUserRole !== 'admin') {
+      showToast('Only admins can edit icons');
+      return;
+    }
+
+    // Get modal elements
+    const modal = document.getElementById("edit-icon-modal");
+    const svgPreview = document.getElementById("edit-icon-svg");
+    const iconIdDisplay = document.getElementById("edit-icon-id");
+    const nameInput = document.getElementById("edit-icon-name");
+    const categoryInput = document.getElementById("edit-icon-category");
+    const clientSelect = document.getElementById("edit-icon-client");
+    const cancelBtn = document.getElementById("edit-icon-cancel");
+    const saveBtn = document.getElementById("edit-icon-save");
+
+    // Populate fields with current icon data
+    svgPreview.innerHTML = icon.svg;
+    iconIdDisplay.textContent = `ID: ${icon.id}`;
+    nameInput.value = icon.name;
+    categoryInput.value = icon.category || '';
+
+    // Populate client dropdown
+    clientSelect.innerHTML = '<option value="">No client</option>';
+    allClients.forEach(client => {
+      const option = document.createElement('option');
+      option.value = client.id;
+      option.textContent = client.name;
+      if (icon.client_id === client.id) {
+        option.selected = true;
+      }
+      clientSelect.appendChild(option);
+    });
+
+    // Show modal
+    modal.classList.remove("hidden");
+
+    // Handle cancel
+    const onCancel = () => {
+      modal.classList.add("hidden");
+      cancelBtn.removeEventListener("click", onCancel);
+      saveBtn.removeEventListener("click", onSave);
+    };
+
+    // Handle save
+    const onSave = async () => {
+      const newName = nameInput.value.trim();
+      const newCategory = categoryInput.value.trim();
+      const newClientId = clientSelect.value || null;
+
+      if (!newName) {
+        showToast('Icon name cannot be empty');
+        return;
+      }
+
+      try {
+        const token = await getAccessToken();
+        const payload = {
+          id: icon.id,
+          name: newName,
+          category: newCategory,
+          svg: icon.svg, // Keep existing SVG
+          client_id: newClientId
+        };
+
+        const res = await fetch(`${ICON_API_BASE}/icons/${icon.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.error || 'Failed to update icon');
+        }
+
+        // Update local icon object
+        icon.name = newName;
+        icon.category = newCategory;
+        icon.client_id = newClientId;
+
+        // Re-render UI
+        invalidateCountCache();
+        const clients = getClients(allIcons);
+        renderClientTabs(clients);
+        renderGrid();
+
+        showToast(`"${newName}" updated`);
+        modal.classList.add("hidden");
+        cancelBtn.removeEventListener("click", onCancel);
+        saveBtn.removeEventListener("click", onSave);
+      } catch (error) {
+        console.error('[Edit] Error:', error);
+        showToast(`Error: ${error.message}`);
+      }
+    };
+
+    cancelBtn.addEventListener("click", onCancel);
+    saveBtn.addEventListener("click", onSave);
   }
 
   // ---- Insert icon into document ----
