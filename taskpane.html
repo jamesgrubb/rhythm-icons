@@ -164,32 +164,75 @@
         <!-- Mixed stroke color picker (hidden by default) -->
         <div id="mixed-stroke-colors" class="mixed-stroke-colors hidden">
           <span class="mixed-stroke-label">Mix colors:</span>
-          <div class="color-selector-group">
-            <select id="mixed-color-1" class="color-select">
-              <option value="Accent1" selected>Accent 1</option>
-              <option value="Accent2">Accent 2</option>
-              <option value="Accent3">Accent 3</option>
-              <option value="Accent4">Accent 4</option>
-              <option value="Accent5">Accent 5</option>
-              <option value="Accent6">Accent 6</option>
-              <option value="Text1">Text 1</option>
-              <option value="Text2">Text 2</option>
-              <option value="Background1">Background 1</option>
-              <option value="Background2">Background 2</option>
-            </select>
-            <span class="color-separator">+</span>
-            <select id="mixed-color-2" class="color-select">
-              <option value="Accent1">Accent 1</option>
-              <option value="Accent2" selected>Accent 2</option>
-              <option value="Accent3">Accent 3</option>
-              <option value="Accent4">Accent 4</option>
-              <option value="Accent5">Accent 5</option>
-              <option value="Accent6">Accent 6</option>
-              <option value="Text1">Text 1</option>
-              <option value="Text2">Text 2</option>
-              <option value="Background1">Background 1</option>
-              <option value="Background2">Background 2</option>
-            </select>
+
+          <!-- First color selector -->
+          <div class="mixed-color-group">
+            <button class="mixed-color-btn active" data-mixed-slot="1" data-color="Accent1" title="Accent 1">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="1" data-color="Accent2" title="Accent 2">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="1" data-color="Accent3" title="Accent 3">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="1" data-color="Accent4" title="Accent 4">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="1" data-color="Accent5" title="Accent 5">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="1" data-color="Accent6" title="Accent 6">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="1" data-color="Text1" title="Text 1">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="1" data-color="Text2" title="Text 2">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="1" data-color="Background1" title="Background 1">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="1" data-color="Background2" title="Background 2">
+              <span class="color-swatch"></span>
+            </button>
+          </div>
+
+          <span class="color-separator">+</span>
+
+          <!-- Second color selector -->
+          <div class="mixed-color-group">
+            <button class="mixed-color-btn" data-mixed-slot="2" data-color="Accent1" title="Accent 1">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn active" data-mixed-slot="2" data-color="Accent2" title="Accent 2">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="2" data-color="Accent3" title="Accent 3">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="2" data-color="Accent4" title="Accent 4">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="2" data-color="Accent5" title="Accent 5">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="2" data-color="Accent6" title="Accent 6">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="2" data-color="Text1" title="Text 1">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="2" data-color="Text2" title="Text 2">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="2" data-color="Background1" title="Background 1">
+              <span class="color-swatch"></span>
+            </button>
+            <button class="mixed-color-btn" data-mixed-slot="2" data-color="Background2" title="Background 2">
+              <span class="color-swatch"></span>
+            </button>
           </div>
         </div>
 

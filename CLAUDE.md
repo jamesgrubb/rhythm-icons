@@ -146,3 +146,59 @@ Each icon requires:
    - `AZURE_CLIENT_ID`
    - `PORT` (optional, defaults to 3000)
 7. Update CORS origins in `server.js` to match production domain
+
+---
+
+## Mixed Stroke Feature
+
+### Overview
+The Mixed Stroke feature allows users to create multicolored icons by randomly assigning two selected theme colors to different stroke elements within a single icon.
+
+### UI Pattern
+- **Visual color swatches** (not text dropdowns) matching the existing theme color picker
+- Two groups of 10 color swatch buttons (one for each color)
+- "+" separator between groups
+- Active state shows accent border + box-shadow ring
+- Swatches display actual PowerPoint theme colors
+
+### Deterministic Color Distribution
+Uses seeded randomization to ensure consistent color patterns:
+- Same icon ID → same color distribution across insertions
+- Different icons have different patterns
+- Pattern is deterministic but appears random visually
+
+**Implementation:**
+```javascript
+// Seeded random generator
+function seededRandom(seed) {
+  let x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+// Generate seed from icon ID
+function getIconColorSeed(iconId) {
+  let hash = 0;
+  for (let i = 0; i < iconId.length; i++) {
+    const char = iconId.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+```
+
+### Key Files
+- `taskpane.html` (lines 164-194): Color swatch button groups
+- `taskpane.css` (lines 518-578): Swatch styling
+- `taskpane.js`:
+  - Line 54-56: DOM references for color buttons
+  - Line 620: Seeded random helper functions
+  - Line 555: `updateMixedStrokeSwatches()` function
+  - Line 691-707: Deterministic color application logic
+  - Line 962-976: Color selection event handlers
+
+### Theme Color Integration
+- Swatches dynamically update with PowerPoint theme colors
+- Called via `updateMixedStrokeSwatches()` after theme color fetch
+- Integrated with existing 5-second theme refresh interval
+- Fallback colors used when PowerPoint API unavailable

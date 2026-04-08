@@ -53,8 +53,7 @@ Office.onReady(async ({ host }) => {
   const fillToggle           = document.getElementById("fill-toggle");
   const mixedStrokeToggle    = document.getElementById("mixed-stroke-toggle");
   const mixedStrokeColors    = document.getElementById("mixed-stroke-colors");
-  const mixedColor1Select    = document.getElementById("mixed-color-1");
-  const mixedColor2Select    = document.getElementById("mixed-color-2");
+  const mixedColorBtns       = document.querySelectorAll(".mixed-color-btn");
   const uploadBtn            = document.getElementById("upload-btn");
   const editModeBtn          = document.getElementById("edit-mode-btn");
   const uploadModal          = document.getElementById("upload-modal");
@@ -554,6 +553,26 @@ Office.onReady(async ({ host }) => {
     });
   }
 
+  // ---- Update mixed stroke color swatches ----
+  function updateMixedStrokeSwatches() {
+    if (!themeColors) return;
+
+    mixedColorBtns.forEach(btn => {
+      const colorName = btn.dataset.color;
+      const hexColor = themeColors[colorName];
+
+      if (hexColor) {
+        const swatch = btn.querySelector('.color-swatch');
+        if (swatch) {
+          swatch.style.backgroundColor = hexColor;
+        }
+
+        // Update tooltip to show hex value
+        btn.title = `${colorName}: ${hexColor}`;
+      }
+    });
+  }
+
   // ---- Refresh theme colors (detects theme changes) ----
   async function refreshThemeColors() {
     if (currentHost !== Office.HostType.PowerPoint) return;
@@ -570,6 +589,7 @@ Office.onReady(async ({ host }) => {
         console.log("[Theme] Theme colors changed, updating UI");
         themeColors = newColors;
         updateColorSwatches();
+        updateMixedStrokeSwatches();
       }
     } catch (error) {
       console.warn("[Theme] Failed to refresh theme colors:", error);
@@ -615,6 +635,24 @@ Office.onReady(async ({ host }) => {
       themeRefreshInterval = null;
       console.log("[Theme] Stopped theme refresh");
     }
+  }
+
+  // ---- Deterministic random generator (seeded) ----
+  function seededRandom(seed) {
+    // Simple hash function to generate consistent pseudo-random values
+    let x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+  }
+
+  function getIconColorSeed(iconId) {
+    // Generate seed from icon ID string
+    let hash = 0;
+    for (let i = 0; i < iconId.length; i++) {
+      const char = iconId.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
   }
 
   // ---- PowerPoint insertion: Insert SVG with theme color support ----
@@ -690,13 +728,20 @@ Office.onReady(async ({ host }) => {
 
       // Add theme class to all shape elements
       if (mixedStroke) {
-        // Mixed stroke mode: Randomly assign selected colors to each element
+        // Mixed stroke mode: Deterministic color assignment based on icon ID
+        // Generate consistent seed from icon ID
+        const seed = getIconColorSeed(icon.id);
+        let elementIndex = 0;
+
         const applyMixedColor = () => {
-          const randomColor = Math.random() < 0.5 ? mixedColor1 : mixedColor2;
-          return `MsftOfcThm_${randomColor}_Stroke_v2`;
+          // Use seeded random for consistent distribution
+          const random = seededRandom(seed + elementIndex);
+          elementIndex++;
+          const selectedColor = random < 0.5 ? mixedColor1 : mixedColor2;
+          return `MsftOfcThm_${selectedColor}_Stroke_v2`;
         };
 
-        // Replace each element individually with random color
+        // Replace each element individually with deterministic color
         modifiedContent = modifiedContent.replace(/<path /g, () => `<path class="${applyMixedColor()}" `);
         modifiedContent = modifiedContent.replace(/<line /g, () => `<line class="${applyMixedColor()}" `);
         modifiedContent = modifiedContent.replace(/<polyline /g, () => `<polyline class="${applyMixedColor()}" `);
@@ -1022,14 +1067,30 @@ Office.onReady(async ({ host }) => {
   });
 
   // ---- Mixed stroke color selectors ----
-  mixedColor1Select.addEventListener("change", () => {
-    mixedColor1 = mixedColor1Select.value;
-    console.log("[MixedStroke] Color 1 changed to:", mixedColor1);
-  });
+  mixedColorBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const slot = btn.dataset.mixedSlot; // "1" or "2"
+      const color = btn.dataset.color;    // e.g., "Accent1"
 
-  mixedColor2Select.addEventListener("change", () => {
-    mixedColor2 = mixedColor2Select.value;
-    console.log("[MixedStroke] Color 2 changed to:", mixedColor2);
+      // Remove active class from all buttons in this slot
+      mixedColorBtns.forEach(b => {
+        if (b.dataset.mixedSlot === slot) {
+          b.classList.remove("active");
+        }
+      });
+
+      // Add active class to clicked button
+      btn.classList.add("active");
+
+      // Update state
+      if (slot === "1") {
+        mixedColor1 = color;
+        console.log("[MixedStroke] Color 1 changed to:", color);
+      } else {
+        mixedColor2 = color;
+        console.log("[MixedStroke] Color 2 changed to:", color);
+      }
+    });
   });
 
   // ---- Sign-in ----
@@ -1045,6 +1106,7 @@ Office.onReady(async ({ host }) => {
       if (currentHost === Office.HostType.PowerPoint) {
         themeColors = await fetchThemeColors();
         updateColorSwatches();
+        updateMixedStrokeSwatches();
         startThemeRefresh(); // Start monitoring for theme changes
       }
 
