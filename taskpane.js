@@ -1048,18 +1048,9 @@ Office.onReady(async ({ host }) => {
     const categories = getCategories(allIcons);
     const clients = getClients(allIcons);
 
-    // Debug logging
-    console.log('[Debug] Total icons:', allIcons.length);
-    console.log('[Debug] Icons with client:', allIcons.filter(i => i.client_name).length);
-    console.log('[Debug] Unique clients:', clients);
-    console.log('[Debug] Sample icon with client:', allIcons.find(i => i.client_name));
-
     renderTabs(categories);
     renderClientTabs(clients);
     renderGrid();
-
-    // Expose for debugging
-    window.__DEBUG_ICONS = allIcons;
   }
 
   // ---- Bootstrap ----
@@ -1456,19 +1447,21 @@ Office.onReady(async ({ host }) => {
 
       for (const icon of uploadedIcons) {
         try {
+          const payload = {
+            id: icon.id,
+            name: icon.name,
+            category: icon.category,
+            svg: icon.svg,
+            client_id: iconClientSelect.value ? parseInt(iconClientSelect.value, 10) : null
+          };
+
           const res = await fetch(`${ICON_API_BASE}/icons`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              id: icon.id,
-              name: icon.name,
-              category: icon.category,
-              svg: icon.svg,
-              client_id: iconClientSelect.value || null
-            })
+            body: JSON.stringify(payload)
           });
 
           if (res.ok) {
