@@ -898,7 +898,23 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 }
 
 #duplicate-rename-input {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.duplicate-hint {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.4;
+  margin: 0 0 12px 0;
+  padding: 8px 10px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--accent);
+}
+
+.duplicate-hint.warning {
+  border-left-color: #FFC000;
+  color: #FFC000;
 }
 
 /* ---- UPLOAD MODAL ---- */

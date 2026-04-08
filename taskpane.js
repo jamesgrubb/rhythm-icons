@@ -230,6 +230,7 @@ Office.onReady(async ({ host }) => {
       const newPreview = document.getElementById("duplicate-new-preview");
       const newName = document.getElementById("duplicate-new-name");
       const renameInput = document.getElementById("duplicate-rename-input");
+      const hintText = document.getElementById("duplicate-hint");
       const skipBtn = document.getElementById("duplicate-skip");
       const addNewBtn = document.getElementById("duplicate-add-new");
       const replaceBtn = document.getElementById("duplicate-replace");
@@ -254,9 +255,21 @@ Office.onReady(async ({ host }) => {
       newPreview.innerHTML = uploaded.svg;
       newName.textContent = uploaded.name;
 
-      // Hide rename input initially
+      // Hide rename input and hint initially
       renameInput.classList.add("hidden");
+      hintText.classList.add("hidden");
       renameInput.value = "";
+
+      // Generate smart placeholder suggestions based on context
+      const baseName = existing.name;
+      const suggestions = [
+        `${baseName} (alternative)`,
+        `${baseName} (outline)`,
+        `${baseName} (updated)`,
+        `${baseName} (new design)`
+      ];
+      const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
+      renameInput.placeholder = `e.g., ${randomSuggestion}`;
 
       // Event handlers
       const cleanup = () => {
@@ -264,8 +277,11 @@ Office.onReady(async ({ host }) => {
         skipBtn.removeEventListener("click", onSkip);
         addNewBtn.removeEventListener("click", onAddNew);
         replaceBtn.removeEventListener("click", onReplace);
-        // Reset button text
+        renameInput.removeEventListener("input", onInputChange);
+        // Reset button text and hint
         addNewBtn.textContent = "Add New";
+        hintText.classList.add("hidden");
+        hintText.classList.remove("warning");
       };
 
       const onSkip = () => {
@@ -273,21 +289,46 @@ Office.onReady(async ({ host }) => {
         resolve({ action: "skip" });
       };
 
+      // Validate input and show warnings for version suffixes
+      const onInputChange = () => {
+        const value = renameInput.value.trim();
+
+        // Check if name ends with version pattern (v2, v3, etc.)
+        if (/\s+v\d+$/i.test(value) || /-v\d+$/i.test(value)) {
+          hintText.textContent = "⚠️ Avoid version numbers! Use descriptive names like \"Icon (outline)\" or \"Icon (alternative)\"";
+          hintText.classList.remove("hidden");
+          hintText.classList.add("warning");
+        } else {
+          hintText.textContent = "💡 Tip: Use a descriptive name instead of version numbers (e.g., \"Icon (outline)\" not \"Icon v2\")";
+          hintText.classList.remove("warning");
+          if (!renameInput.classList.contains("hidden")) {
+            hintText.classList.remove("hidden");
+          }
+        }
+      };
+
       const onAddNew = async () => {
         // If rename input is hidden, show it and wait for user to enter name
         if (renameInput.classList.contains("hidden")) {
           renameInput.classList.remove("hidden");
+          hintText.classList.remove("hidden");
           renameInput.focus();
           renameInput.value = uploaded.name;
+          renameInput.addEventListener("input", onInputChange);
           addNewBtn.textContent = "Confirm New Name";
         } else {
           // User confirmed new name
           const newNameValue = renameInput.value.trim();
           if (!newNameValue) {
-            // Use customAlert instead of alert
             await customAlert("Please enter a name for the new icon.", "Invalid Name");
             return;
           }
+
+          // Warn if still using version suffix, but allow it
+          if (/\s+v\d+$/i.test(newNameValue) || /-v\d+$/i.test(newNameValue)) {
+            console.warn("[Upload] User chose a version-style name:", newNameValue);
+          }
+
           console.log("[Upload] Add New confirmed with name:", newNameValue);
           cleanup();
           resolve({ action: "addNew", newName: newNameValue });
@@ -1574,8 +1615,14 @@ Office.onReady(async ({ host }) => {
         let svgContent = await file.text();
         console.log("[Upload] Read file content, length:", svgContent.length);
 
-        const iconName = file.name.replace('.svg', '').replace(/[-_]/g, ' ');
+        // Extract icon name and ID from filename
+        let iconName = file.name.replace('.svg', '').replace(/[-_]/g, ' ');
         const iconId = file.name.replace('.svg', '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+        // Auto-strip version suffixes from display name (v2, v3, etc.)
+        // Keep them in the ID for duplicate detection, but not in the display name
+        iconName = iconName.replace(/\s+v\d+$/i, '');
+        console.log(`[Upload] Filename: "${file.name}" → Name: "${iconName}" (version suffix stripped)`);
 
         // Clean up SVG content
         svgContent = svgContent.trim();
