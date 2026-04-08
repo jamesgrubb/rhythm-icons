@@ -837,6 +837,70 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   border-color: var(--border-2);
 }
 
+/* ---- DUPLICATE ICON MODAL ---- */
+.duplicate-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 16px 0;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.duplicate-existing,
+.duplicate-new {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.duplicate-label {
+  font-size: 10px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+#duplicate-existing-preview,
+#duplicate-new-preview {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+#duplicate-existing-preview svg,
+#duplicate-new-preview svg {
+  width: 48px;
+  height: 48px;
+  stroke: var(--text-2);
+}
+
+#duplicate-existing-name,
+#duplicate-new-name {
+  font-size: 11px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.duplicate-arrow {
+  font-size: 20px;
+  color: var(--text-3);
+}
+
+#duplicate-rename-input {
+  margin-bottom: 12px;
+}
+
 /* ---- UPLOAD MODAL ---- */
 .modal {
   position: fixed;
@@ -1045,6 +1109,32 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 .preview-icon svg * {
   stroke-width: 0.5px !important;
 }
+
+/* Duplicate icon indicator */
+.preview-icon {
+  position: relative;
+}
+
+.preview-icon-duplicate {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.duplicate-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  z-index: 1;
+}
+
 .export-section {
   display: flex;
   flex-direction: column;

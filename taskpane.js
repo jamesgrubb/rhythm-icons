@@ -219,6 +219,91 @@ Office.onReady(async ({ host }) => {
     });
   }
 
+  // Custom duplicate icon prompt
+  function promptDuplicateAction(duplicateInfo) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById("duplicate-modal");
+      const title = document.getElementById("duplicate-title");
+      const message = document.getElementById("duplicate-message");
+      const existingPreview = document.getElementById("duplicate-existing-preview");
+      const existingName = document.getElementById("duplicate-existing-name");
+      const newPreview = document.getElementById("duplicate-new-preview");
+      const newName = document.getElementById("duplicate-new-name");
+      const renameInput = document.getElementById("duplicate-rename-input");
+      const skipBtn = document.getElementById("duplicate-skip");
+      const addNewBtn = document.getElementById("duplicate-add-new");
+      const replaceBtn = document.getElementById("duplicate-replace");
+
+      // Set content
+      const { uploaded, existing, isVersioned } = duplicateInfo;
+
+      if (isVersioned) {
+        title.textContent = "Icon Version Detected";
+        message.textContent = `You're uploading "${uploaded.name}" but "${existing.name}" already exists. What would you like to do?`;
+      } else {
+        title.textContent = "Icon Already Exists";
+        message.textContent = `An icon named "${existing.name}" already exists. Replace it or add as new?`;
+      }
+
+      // Render previews
+      existingPreview.innerHTML = existing.svg;
+      existingName.textContent = existing.name;
+      newPreview.innerHTML = uploaded.svg;
+      newName.textContent = uploaded.name;
+
+      // Hide rename input initially
+      renameInput.classList.add("hidden");
+      renameInput.value = "";
+
+      // Event handlers
+      const cleanup = () => {
+        modal.classList.add("hidden");
+        skipBtn.removeEventListener("click", onSkip);
+        addNewBtn.removeEventListener("click", onAddNew);
+        replaceBtn.removeEventListener("click", onReplace);
+        // Reset button text
+        addNewBtn.textContent = "Add New";
+      };
+
+      const onSkip = () => {
+        cleanup();
+        resolve({ action: "skip" });
+      };
+
+      const onAddNew = () => {
+        // If rename input is hidden, show it and wait for user to enter name
+        if (renameInput.classList.contains("hidden")) {
+          renameInput.classList.remove("hidden");
+          renameInput.focus();
+          renameInput.value = uploaded.name;
+          addNewBtn.textContent = "Confirm New Name";
+        } else {
+          // User confirmed new name
+          const newNameValue = renameInput.value.trim();
+          if (!newNameValue) {
+            // Use customAlert instead of alert
+            customAlert("Please enter a name for the new icon.", "Invalid Name");
+            return;
+          }
+          cleanup();
+          resolve({ action: "addNew", newName: newNameValue });
+        }
+      };
+
+      const onReplace = () => {
+        cleanup();
+        resolve({ action: "replace" });
+      };
+
+      skipBtn.addEventListener("click", onSkip);
+      addNewBtn.addEventListener("click", onAddNew);
+      replaceBtn.addEventListener("click", onReplace);
+
+      // Show modal
+      modal.classList.remove("hidden");
+    });
+  }
+
   // ---- Render ----
   function renderClientTabs(clients) {
     clientTabs.innerHTML = "";
@@ -1371,6 +1456,45 @@ Office.onReady(async ({ host }) => {
     }
   }
 
+  // ---- Version Pattern Detection Helper Functions ----
+  function getBaseIconId(iconId) {
+    // Strip version suffixes: -v2, -v3, -v10, etc.
+    return iconId.replace(/-v\d+$/, '');
+  }
+
+  function hasVersionSuffix(iconId) {
+    return /-v\d+$/.test(iconId);
+  }
+
+  function getVersionNumber(iconId) {
+    const match = iconId.match(/-v(\d+)$/);
+    return match ? parseInt(match[1], 10) : null;
+  }
+
+  // ---- Check for Duplicate Icons ----
+  function findDuplicates(uploadedIcons, existingIcons) {
+    const duplicates = [];
+
+    uploadedIcons.forEach(uploaded => {
+      const baseId = getBaseIconId(uploaded.id);
+
+      // Check if base icon exists
+      const existing = existingIcons.find(icon => icon.id === baseId);
+
+      if (existing) {
+        duplicates.push({
+          uploaded: uploaded,
+          existing: existing,
+          baseId: baseId,
+          isVersioned: hasVersionSuffix(uploaded.id),
+          versionNumber: getVersionNumber(uploaded.id)
+        });
+      }
+    });
+
+    return duplicates;
+  }
+
   // ---- Bulk Upload ----
   uploadBtn.addEventListener("click", async () => {
     // Load clients when opening upload modal
@@ -1537,6 +1661,25 @@ Office.onReady(async ({ host }) => {
     }
 
     if (uploadedIcons.length > 0) {
+      // Check for duplicates
+      console.log("[Upload] Checking for duplicates. allIcons count:", allIcons.length);
+      console.log("[Upload] uploadedIcons:", uploadedIcons.map(i => ({ id: i.id, name: i.name })));
+      console.log("[Upload] Sample existing icons:", allIcons.slice(0, 5).map(i => ({ id: i.id, name: i.name })));
+
+      const duplicates = findDuplicates(uploadedIcons, allIcons);
+
+      if (duplicates.length > 0) {
+        console.log(`[Upload] Found ${duplicates.length} duplicate(s):`, duplicates);
+
+        // Add visual indicator to preview grid
+        duplicates.forEach(dup => {
+          const uploadedIcon = dup.uploaded;
+          // Mark icon as duplicate in uploadedIcons array
+          uploadedIcon._isDuplicate = true;
+          uploadedIcon._duplicateInfo = dup;
+        });
+      }
+
       console.log("[Upload] Calling renderPreview()...");
       renderPreview();
       console.log("[Upload] Showing preview section...");
@@ -1561,6 +1704,16 @@ Office.onReady(async ({ host }) => {
       const div = document.createElement("div");
       div.className = "preview-icon";
       div.title = icon.name;
+
+      // Add duplicate warning badge
+      if (icon._isDuplicate) {
+        div.classList.add("preview-icon-duplicate");
+        const badge = document.createElement("span");
+        badge.className = "duplicate-badge";
+        badge.textContent = "Duplicate";
+        badge.title = `Icon "${icon._duplicateInfo.existing.name}" already exists`;
+        div.appendChild(badge);
+      }
 
       console.log(`[Preview] Icon ${index}:`, icon.name, "SVG length:", icon.svg.length);
 
@@ -1606,23 +1759,59 @@ Office.onReady(async ({ host }) => {
   copyCodeBtn.addEventListener("click", async () => {
     if (uploadedIcons.length === 0) return;
 
+    const category = iconCategoryInput.value.trim() || "Custom";
+    const client_id = iconClientSelect.value || null;
+
     copyCodeBtn.disabled = true;
-    copyCodeBtn.textContent = `Uploading ${uploadedIcons.length} icons...`;
+    copyCodeBtn.textContent = "Uploading...";
+
+    const token = await getAccessToken();
+    let createdCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
 
     try {
-      const token = await getAccessToken();
-      let createdCount = 0;
-      let updatedCount = 0;
-      let failedCount = 0;
-
+      // Process each icon
       for (const icon of uploadedIcons) {
-        try {
+        let iconToUpload = { ...icon, category };
+        let shouldUpload = true;
+
+        console.log(`[Upload] Processing icon: ${icon.name}, isDuplicate: ${icon._isDuplicate}`);
+
+        // Check if this is a duplicate
+        if (icon._isDuplicate) {
+          console.log(`[Upload] Prompting for duplicate: ${icon.name}`);
+
+          // Prompt user for action
+          const decision = await promptDuplicateAction(icon._duplicateInfo);
+
+          if (decision.action === "skip") {
+            console.log(`[Upload] Skipped: ${icon.name}`);
+            skippedCount++;
+            shouldUpload = false;
+          } else if (decision.action === "addNew") {
+            console.log(`[Upload] Adding as new: ${decision.newName}`);
+            // Generate new ID from new name
+            const newId = decision.newName
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-');
+            iconToUpload.id = newId;
+            iconToUpload.name = decision.newName;
+          } else if (decision.action === "replace") {
+            console.log(`[Upload] Replacing: ${icon._duplicateInfo.existing.name}`);
+            // Use existing icon's ID to trigger UPSERT update
+            iconToUpload.id = icon._duplicateInfo.existing.id;
+          }
+        }
+
+        // Upload icon if not skipped
+        if (shouldUpload) {
           const payload = {
-            id: icon.id,
-            name: icon.name,
-            category: icon.category,
-            svg: icon.svg,
-            client_id: iconClientSelect.value || null
+            id: iconToUpload.id,
+            name: iconToUpload.name,
+            category: iconToUpload.category,
+            svg: iconToUpload.svg,
+            client_id: client_id
           };
 
           const res = await fetch(`${ICON_API_BASE}/icons`, {
@@ -1642,37 +1831,36 @@ Office.onReady(async ({ host }) => {
               updatedCount++;
             }
           } else {
-            const error = await res.json();
-            console.error('[Upload] Failed:', icon.name, error);
-            failedCount++;
+            console.error(`[Upload] Failed to upload ${iconToUpload.name}:`, await res.text());
+            skippedCount++;
           }
-        } catch (err) {
-          console.error('[Upload] Failed:', icon.name, err);
-          failedCount++;
         }
       }
 
-      // Reload icons from API to get updated list
+      // Reload icons
       await loadIcons(token);
 
-      // Show detailed result message
-      const parts = [];
-      if (createdCount > 0) parts.push(`${createdCount} created`);
-      if (updatedCount > 0) parts.push(`${updatedCount} updated`);
-      if (failedCount > 0) parts.push(`${failedCount} failed`);
-      showToast(parts.join(', '));
+      // Show success message
+      const summary = [];
+      if (createdCount > 0) summary.push(`${createdCount} created`);
+      if (updatedCount > 0) summary.push(`${updatedCount} updated`);
+      if (skippedCount > 0) summary.push(`${skippedCount} skipped`);
+
+      showToast(summary.join(', '));
 
       // Close modal and reset
       uploadModal.classList.add("hidden");
       uploadedIcons = [];
       previewSection.classList.add("hidden");
       svgFileInput.value = "";
-    } catch (err) {
-      console.error('[Upload] Error:', err);
-      showToast(`Error: ${err.message}`);
+      iconCategoryInput.value = "Custom";
+
+    } catch (error) {
+      console.error("[Upload] Error:", error);
+      showToast("Upload failed. Please try again.");
     } finally {
       copyCodeBtn.disabled = false;
-      copyCodeBtn.textContent = 'Upload to Library';
+      copyCodeBtn.textContent = "Upload to Library";
     }
   });
 

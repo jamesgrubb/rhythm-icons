@@ -335,6 +335,36 @@
           </div>
         </div>
       </div>
+
+      <!-- DUPLICATE ICON CONFIRMATION MODAL -->
+      <div id="duplicate-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+          <h3 id="duplicate-title">Icon Already Exists</h3>
+          <p id="duplicate-message"></p>
+
+          <div class="duplicate-preview">
+            <div class="duplicate-existing">
+              <span class="duplicate-label">Existing:</span>
+              <div id="duplicate-existing-preview"></div>
+              <span id="duplicate-existing-name"></span>
+            </div>
+            <div class="duplicate-arrow">→</div>
+            <div class="duplicate-new">
+              <span class="duplicate-label">New:</span>
+              <div id="duplicate-new-preview"></div>
+              <span id="duplicate-new-name"></span>
+            </div>
+          </div>
+
+          <input type="text" id="duplicate-rename-input" class="confirm-input hidden" placeholder="Enter new name..." />
+
+          <div class="modal-actions">
+            <button id="duplicate-skip" class="btn-secondary">Skip</button>
+            <button id="duplicate-add-new" class="btn-secondary">Add New</button>
+            <button id="duplicate-replace" class="btn-primary">Replace</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- LOADING OVERLAY -->
