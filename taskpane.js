@@ -232,7 +232,6 @@ Office.onReady(async ({ host }) => {
       const renameInput = document.getElementById("duplicate-rename-input");
       const hintText = document.getElementById("duplicate-hint");
       const skipBtn = document.getElementById("duplicate-skip");
-      const addNewBtn = document.getElementById("duplicate-add-new");
       const replaceBtn = document.getElementById("duplicate-replace");
 
       // Set content
@@ -240,20 +239,23 @@ Office.onReady(async ({ host }) => {
 
       if (isExactMatch) {
         title.textContent = "Icon Already Exists";
-        message.textContent = `An icon named "${existing.name}" already exists. What would you like to do?`;
+        message.textContent = `"${existing.name}" is already in your library.`;
       } else if (isVersioned) {
-        title.textContent = "Icon Version Detected";
-        message.textContent = `You're uploading "${uploaded.name}" but "${existing.name}" already exists. What would you like to do?`;
+        title.textContent = "Similar Icon Found";
+        message.textContent = `"${existing.name}" already exists in your library.`;
       } else {
         title.textContent = "Icon Already Exists";
-        message.textContent = `An icon named "${existing.name}" already exists. Replace it or add as new?`;
+        message.textContent = `"${existing.name}" is already in your library.`;
       }
 
-      // Render previews
+      // Render previews - show what exists vs what's being uploaded
       existingPreview.innerHTML = existing.svg;
       existingName.textContent = existing.name;
       newPreview.innerHTML = uploaded.svg;
-      newName.textContent = uploaded.name;
+
+      // Show the original filename to avoid confusion
+      const uploadFileName = uploaded.name;
+      newName.textContent = uploadFileName;
 
       // Hide rename input and hint initially
       renameInput.classList.add("hidden");
@@ -275,12 +277,11 @@ Office.onReady(async ({ host }) => {
       const cleanup = () => {
         modal.classList.add("hidden");
         skipBtn.removeEventListener("click", onSkip);
-        addNewBtn.removeEventListener("click", onAddNew);
-        replaceBtn.removeEventListener("click", onReplace);
+        replaceBtn.removeEventListener("click", handleReplaceClick);
         renameInput.removeEventListener("input", onInputChange);
         // Reset button text, visibility, and hint
-        addNewBtn.textContent = "Add New";
-        skipBtn.textContent = "Skip";
+        skipBtn.textContent = "Skip Upload";
+        replaceBtn.textContent = "Update Existing";
         skipBtn.style.display = "block";
         replaceBtn.style.display = "block";
         hintText.classList.add("hidden");
@@ -294,8 +295,9 @@ Office.onReady(async ({ host }) => {
           hintText.classList.add("hidden");
           skipBtn.style.display = "block";
           replaceBtn.style.display = "block";
-          addNewBtn.textContent = "Add New";
-          skipBtn.textContent = "Skip";
+          replaceBtn.textContent = "Update Existing";
+          skipBtn.textContent = "Skip Upload";
+          isReplaceRenameMode = false;
         } else {
           // Normal skip behavior
           cleanup();
@@ -336,7 +338,7 @@ Office.onReady(async ({ host }) => {
           replaceBtn.style.display = "none";
 
           // Change button to show cancel option
-          addNewBtn.textContent = "Confirm";
+          addNewBtn.textContent = "Save";
           skipBtn.textContent = "Cancel";
           skipBtn.style.display = "block";
         } else {
@@ -359,13 +361,54 @@ Office.onReady(async ({ host }) => {
       };
 
       const onReplace = () => {
-        cleanup();
-        resolve({ action: "replace" });
+        // If uploading a versioned file (e.g., icon-v2.svg), offer to rename when updating
+        if (isVersioned && !isExactMatch) {
+          // Show rename input for versioned updates
+          renameInput.classList.remove("hidden");
+          hintText.classList.remove("hidden");
+          hintText.textContent = "💡 Optional: Update the name when replacing (or leave as is)";
+          hintText.classList.remove("warning");
+          renameInput.focus();
+          renameInput.value = existing.name; // Pre-fill with current name
+          renameInput.addEventListener("input", onInputChange);
+
+          // Hide Skip button during rename
+          skipBtn.style.display = "none";
+
+          // Change Replace button to confirm
+          replaceBtn.textContent = "Confirm Update";
+          skipBtn.textContent = "Cancel";
+          skipBtn.style.display = "block";
+        } else {
+          // Direct replace for exact matches
+          cleanup();
+          resolve({ action: "replace" });
+        }
+      };
+
+      // Track which mode we're in for Replace button
+      let isReplaceRenameMode = false;
+
+      const handleReplaceClick = () => {
+        if (isReplaceRenameMode) {
+          // Confirm the rename for replace action
+          const newNameValue = renameInput.value.trim();
+          if (!newNameValue) {
+            customAlert("Please enter a name for the icon.", "Invalid Name");
+            return;
+          }
+
+          console.log("[Upload] Replace with new name:", newNameValue);
+          cleanup();
+          resolve({ action: "replace", newName: newNameValue });
+        } else {
+          onReplace();
+          isReplaceRenameMode = true; // Track that we're now in rename mode (if applicable)
+        }
       };
 
       skipBtn.addEventListener("click", onSkip);
-      addNewBtn.addEventListener("click", onAddNew);
-      replaceBtn.addEventListener("click", onReplace);
+      replaceBtn.addEventListener("click", handleReplaceClick);
 
       // Show modal
       modal.classList.remove("hidden");
@@ -1895,22 +1938,19 @@ Office.onReady(async ({ host }) => {
             console.log(`[Upload] Skipped: ${icon.name}`);
             skippedCount++;
             shouldUpload = false;
-          } else if (decision.action === "addNew") {
-            console.log(`[Upload] Adding as new: ${decision.newName}`);
-            // Generate new ID from new name
-            const newId = decision.newName
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, '-');
-            iconToUpload.id = newId;
-            iconToUpload.name = decision.newName;
-            console.log(`[Upload] New icon will be: id="${newId}", name="${decision.newName}"`);
           } else if (decision.action === "replace") {
             console.log(`[Upload] Replacing: ${icon._duplicateInfo.existing.name}`);
             // Use existing icon's ID to trigger UPSERT update
-            // Keep the existing icon's name and ID
             iconToUpload.id = icon._duplicateInfo.existing.id;
-            iconToUpload.name = icon._duplicateInfo.existing.name;
-            console.log(`[Upload] Replace will use: id="${iconToUpload.id}", name="${iconToUpload.name}"`);
+
+            // If user provided a new name during replace, use it; otherwise keep existing name
+            if (decision.newName) {
+              iconToUpload.name = decision.newName;
+              console.log(`[Upload] Replace with new name: id="${iconToUpload.id}", name="${iconToUpload.name}"`);
+            } else {
+              iconToUpload.name = icon._duplicateInfo.existing.name;
+              console.log(`[Upload] Replace keeping name: id="${iconToUpload.id}", name="${iconToUpload.name}"`);
+            }
           }
         }
 
