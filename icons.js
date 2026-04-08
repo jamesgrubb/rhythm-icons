@@ -707,15 +707,23 @@ function getClients(icons) {
 }
 
 /**
- * Filter icons by category, client, and/or search query.
+ * Filter icons by client and/or search query.
+ * Search includes: icon name, category, ID, and client name.
  */
-function filterIcons(icons, { category = "All", client = "All", query = "" } = {}) {
+function filterIcons(icons, { client = "All", query = "" } = {}) {
   const q = query.toLowerCase().trim();
   return icons.filter(icon => {
-    const inCat = category === "All" || icon.category === category;
     const inClient = client === "All" || (icon.client_name === client) || (!icon.client_name && client === "Unassigned");
-    const inQuery = !q || icon.name.toLowerCase().includes(q) || icon.category.toLowerCase().includes(q) || icon.id.includes(q);
-    return inCat && inClient && inQuery;
+    const clientName = (icon.client_name || "").toLowerCase();
+    const inQuery = !q ||
+                    icon.name.toLowerCase().includes(q) ||
+                    icon.category.toLowerCase().includes(q) ||
+                    icon.id.includes(q) ||
+                    clientName.includes(q);
+    // TODO: Add tag search when implemented:
+    // const tags = (icon.tags || []).map(t => t.toLowerCase()).join(" ");
+    // ... || tags.includes(q)
+    return inClient && inQuery;
   });
 }
 

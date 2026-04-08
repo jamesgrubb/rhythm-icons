@@ -72,7 +72,6 @@ Office.onReady(async ({ host }) => {
 
   // ---- State ----
   let allIcons       = [];
-  let activeCategory = "All";
   let activeClient   = "All";
   let activeQuery    = "";
   let selectedSize   = 48;   // px — inserted icon size
@@ -215,37 +214,6 @@ Office.onReady(async ({ host }) => {
   }
 
   // ---- Render ----
-  function renderTabs(categories) {
-    // Remove existing tenant header if any
-    const existingHeader = document.querySelector('.tenant-header');
-    if (existingHeader) existingHeader.remove();
-
-    // Add tenant header above tabs
-    if (currentUserProfile) {
-      const tenantHeader = document.createElement('div');
-      tenantHeader.className = 'tenant-header';
-      tenantHeader.innerHTML = `
-        <strong>${currentUserProfile.tenant.name}</strong>
-        <span style="opacity: 0.7;">${allIcons.length} icon${allIcons.length !== 1 ? 's' : ''}</span>
-      `;
-      categoryTabs.before(tenantHeader);
-    }
-
-    // Render category tabs
-    categoryTabs.innerHTML = "";
-    categories.forEach(cat => {
-      const btn = document.createElement("button");
-      btn.className = "tab-btn" + (cat === activeCategory ? " active" : "");
-      btn.textContent = cat;
-      btn.addEventListener("click", () => {
-        activeCategory = cat;
-        document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.textContent === cat));
-        renderGrid();
-      });
-      categoryTabs.appendChild(btn);
-    });
-  }
-
   function renderClientTabs(clients) {
     clientTabs.innerHTML = "";
 
@@ -257,20 +225,63 @@ Office.onReady(async ({ host }) => {
 
     clientTabs.style.display = "flex";
     clients.forEach(client => {
+      // Calculate count for this client
+      const count = getCachedClientCount(client, activeQuery);
+
       const btn = document.createElement("button");
       btn.className = "tab-btn client-tab-btn" + (client === activeClient ? " active" : "");
-      btn.textContent = client;
+      btn.textContent = `${client} (${count})`;
       btn.addEventListener("click", () => {
         activeClient = client;
-        clientTabs.querySelectorAll(".client-tab-btn").forEach(b => b.classList.toggle("active", b.textContent === client));
+        // Re-render tabs to update counts and active state
+        renderClientTabs(clients);
         renderGrid();
       });
       clientTabs.appendChild(btn);
     });
   }
 
+  /**
+   * Calculate icon count for a specific client
+   */
+  function calculateClientIconCount(clientName, query = "") {
+    const filtered = filterIcons(allIcons, {
+      client: clientName,
+      query: query
+    });
+    return filtered.length;
+  }
+
+  /**
+   * Count cache for performance optimization
+   */
+  let clientCountCache = new Map();
+  let lastCountCacheQuery = "";
+
+  function getCachedClientCount(clientName, query) {
+    const cacheKey = `${clientName}:${query}`;
+
+    // Invalidate cache if query changed
+    if (query !== lastCountCacheQuery) {
+      clientCountCache.clear();
+      lastCountCacheQuery = query;
+    }
+
+    if (!clientCountCache.has(cacheKey)) {
+      const count = calculateClientIconCount(clientName, query);
+      clientCountCache.set(cacheKey, count);
+    }
+
+    return clientCountCache.get(cacheKey);
+  }
+
+  function invalidateCountCache() {
+    clientCountCache.clear();
+    lastCountCacheQuery = "";
+  }
+
   function renderGrid() {
-    const visible = filterIcons(allIcons, { category: activeCategory, client: activeClient, query: activeQuery });
+    const visible = filterIcons(allIcons, { client: activeClient, query: activeQuery });
     resultCount.textContent = `${visible.length} icon${visible.length !== 1 ? "s" : ""}`;
 
     if (visible.length === 0) {
@@ -353,9 +364,8 @@ Office.onReady(async ({ host }) => {
       allIcons = allIcons.filter(i => i.id !== icon.id);
 
       // Re-render UI
-      const categories = getCategories(allIcons);
+      invalidateCountCache();
       const clients = getClients(allIcons);
-      renderTabs(categories);
       renderClientTabs(clients);
       renderGrid();
 
@@ -882,6 +892,11 @@ Office.onReady(async ({ host }) => {
   searchInput.addEventListener("input", () => {
     activeQuery = searchInput.value;
     clearSearch.classList.toggle("hidden", !activeQuery);
+
+    // Refresh client tabs to update counts based on search
+    const clients = getClients(allIcons);
+    renderClientTabs(clients);
+
     renderGrid();
   });
 
@@ -890,6 +905,11 @@ Office.onReady(async ({ host }) => {
     activeQuery = "";
     clearSearch.classList.add("hidden");
     searchInput.focus();
+
+    // Refresh client tabs to show full counts
+    const clients = getClients(allIcons);
+    renderClientTabs(clients);
+
     renderGrid();
   });
 
@@ -983,7 +1003,6 @@ Office.onReady(async ({ host }) => {
       themeColors = null;
       allIcons = [];
       iconGrid.innerHTML = "";
-      activeCategory = "All";
       activeQuery = "";
       showScreen("auth");
     } catch (err) {
@@ -1045,10 +1064,9 @@ Office.onReady(async ({ host }) => {
 
     // Fetch icons
     allIcons = await fetchIconsFromAPI(accessToken);
-    const categories = getCategories(allIcons);
+    invalidateCountCache();
     const clients = getClients(allIcons);
 
-    renderTabs(categories);
     renderClientTabs(clients);
     renderGrid();
   }
