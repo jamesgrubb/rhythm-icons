@@ -1198,7 +1198,7 @@ Office.onReady(async ({ host }) => {
       // Select the newly created client
       iconClientSelect.value = newClient.id;
 
-      showToast(`Client "${newClient.name}" created`);
+      showToast(`Client "${newClient.name}" created - now upload icons to assign`);
     } catch (error) {
       console.error('[Clients] Error creating:', error);
       await customAlert(error.message, 'Error Creating Client');
