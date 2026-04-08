@@ -40,6 +40,7 @@ Office.onReady(async ({ host }) => {
   const authError      = document.getElementById("auth-error");
   const searchInput    = document.getElementById("search-input");
   const clearSearch    = document.getElementById("clear-search");
+  const clientTabs     = document.getElementById("client-tabs");
   const categoryTabs   = document.getElementById("category-tabs");
   const iconGrid       = document.getElementById("icon-grid");
   const emptyState     = document.getElementById("empty-state");
@@ -65,10 +66,13 @@ Office.onReady(async ({ host }) => {
   const confirmMessage       = document.getElementById("confirm-message");
   const confirmOkBtn         = document.getElementById("confirm-ok");
   const confirmCancelBtn     = document.getElementById("confirm-cancel");
+  const iconClientSelect     = document.getElementById("icon-client");
+  const addClientBtn         = document.getElementById("add-client-btn");
 
   // ---- State ----
   let allIcons       = [];
   let activeCategory = "All";
+  let activeClient   = "All";
   let activeQuery    = "";
   let selectedSize   = 48;   // px — inserted icon size
   let selectedColor  = "Accent1";  // PowerPoint theme color
@@ -81,6 +85,7 @@ Office.onReady(async ({ host }) => {
   let isEditMode = false;  // Edit mode for deleting icons
   let themeColors = null; // Actual PowerPoint theme colors (fetched via API)
   let themeRefreshInterval = null; // Interval for periodic theme color refresh
+  let allClients = []; // All clients for current tenant
 
   // ---- Helpers ----
   function showScreen(name) {
@@ -183,8 +188,31 @@ Office.onReady(async ({ host }) => {
     });
   }
 
+  function renderClientTabs(clients) {
+    clientTabs.innerHTML = "";
+
+    // Only show client tabs if there are multiple clients or any assigned icons
+    if (clients.length <= 1) {
+      clientTabs.style.display = "none";
+      return;
+    }
+
+    clientTabs.style.display = "flex";
+    clients.forEach(client => {
+      const btn = document.createElement("button");
+      btn.className = "tab-btn client-tab-btn" + (client === activeClient ? " active" : "");
+      btn.textContent = client;
+      btn.addEventListener("click", () => {
+        activeClient = client;
+        clientTabs.querySelectorAll(".client-tab-btn").forEach(b => b.classList.toggle("active", b.textContent === client));
+        renderGrid();
+      });
+      clientTabs.appendChild(btn);
+    });
+  }
+
   function renderGrid() {
-    const visible = filterIcons(allIcons, { category: activeCategory, query: activeQuery });
+    const visible = filterIcons(allIcons, { category: activeCategory, client: activeClient, query: activeQuery });
     resultCount.textContent = `${visible.length} icon${visible.length !== 1 ? "s" : ""}`;
 
     if (visible.length === 0) {
@@ -268,7 +296,9 @@ Office.onReady(async ({ host }) => {
 
       // Re-render UI
       const categories = getCategories(allIcons);
+      const clients = getClients(allIcons);
       renderTabs(categories);
+      renderClientTabs(clients);
       renderGrid();
 
       showToast(`"${icon.name}" deleted`);
@@ -958,7 +988,9 @@ Office.onReady(async ({ host }) => {
     // Fetch icons
     allIcons = await fetchIconsFromAPI(accessToken);
     const categories = getCategories(allIcons);
+    const clients = getClients(allIcons);
     renderTabs(categories);
+    renderClientTabs(clients);
     renderGrid();
 
     // Expose for debugging
@@ -1048,10 +1080,81 @@ Office.onReady(async ({ host }) => {
     }
   }
 
+  // ---- Client Management ----
+  async function fetchClients() {
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/clients`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to fetch clients');
+      }
+
+      allClients = await res.json();
+      populateClientSelect();
+    } catch (error) {
+      console.error('[Clients] Error fetching:', error);
+      allClients = [];
+    }
+  }
+
+  function populateClientSelect() {
+    // Clear existing options except the first one
+    iconClientSelect.innerHTML = '<option value="">Select client...</option>';
+
+    // Add client options
+    allClients.forEach(client => {
+      const option = document.createElement('option');
+      option.value = client.id;
+      option.textContent = client.name;
+      iconClientSelect.appendChild(option);
+    });
+  }
+
+  async function addNewClient() {
+    const clientName = prompt('Enter new client name:');
+    if (!clientName || !clientName.trim()) return;
+
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/clients`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: clientName.trim() })
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to create client');
+      }
+
+      const newClient = await res.json();
+      allClients.push(newClient);
+      populateClientSelect();
+
+      // Select the newly created client
+      iconClientSelect.value = newClient.id;
+
+      showToast(`Client "${newClient.name}" created`);
+    } catch (error) {
+      console.error('[Clients] Error creating:', error);
+      await customAlert(error.message, 'Error Creating Client');
+    }
+  }
+
   // ---- Bulk Upload ----
-  uploadBtn.addEventListener("click", () => {
+  uploadBtn.addEventListener("click", async () => {
+    // Load clients when opening upload modal
+    await fetchClients();
     uploadModal.classList.remove("hidden");
   });
+
+  addClientBtn.addEventListener("click", addNewClient);
 
   closeUpload.addEventListener("click", () => {
     uploadModal.classList.add("hidden");
@@ -1298,7 +1401,8 @@ Office.onReady(async ({ host }) => {
               id: icon.id,
               name: icon.name,
               category: icon.category,
-              svg: icon.svg
+              svg: icon.svg,
+              client_id: iconClientSelect.value || null
             })
           });
 

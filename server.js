@@ -344,14 +344,17 @@ app.get("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireR
       return res.status(403).json({ error: "No tenant found for user" });
     }
 
-    // Fetch icons for this tenant OR public icons, include tenant name
+    // Fetch icons for this tenant OR public icons, include tenant and client names
     const result = await pool.query(
       `SELECT i.icon_id as id, i.name, i.category, i.svg, i.is_public,
-              t.name as tenant_name
+              t.name as tenant_name,
+              c.id as client_id,
+              c.name as client_name
        FROM icons i
        LEFT JOIN tenants t ON i.tenant_id = t.id
+       LEFT JOIN clients c ON i.client_id = c.id
        WHERE i.tenant_id = $1 OR i.is_public = true
-       ORDER BY i.category, i.name`,
+       ORDER BY c.name NULLS LAST, i.category, i.name`,
       [tenantId]
     );
 
@@ -392,7 +395,7 @@ app.get("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
 
 // POST /api/icons — add a new icon (admin only)
 app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
-  const { id, name, category, svg } = req.body;
+  const { id, name, category, svg, client_id } = req.body;
 
   if (!id || !name || !category || !svg) {
     return res.status(400).json({ error: "Missing required fields: id, name, category, svg" });
@@ -430,9 +433,9 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
     }
 
     await pool.query(
-      `INSERT INTO icons (tenant_id, icon_id, name, category, svg)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [tenantId, id, name, category, svg]
+      `INSERT INTO icons (tenant_id, icon_id, name, category, svg, client_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [tenantId, id, name, category, svg, client_id || null]
     );
 
     console.log('[API] Icon created by admin:', req.user.email, '- Icon ID:', id);
@@ -468,6 +471,93 @@ app.get("/api/user/profile", requireAuth, ensureTenantExists, extractUserRole, a
   } catch (error) {
     console.error('[API] Error fetching profile:', error);
     res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// =============================================
+// CLIENT MANAGEMENT ENDPOINTS
+// =============================================
+
+// GET /api/clients — get all clients for current tenant
+app.get("/api/clients", requireAuth, ensureTenantExists, extractUserRole, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(403).json({ error: "No tenant found for user" });
+    }
+
+    const result = await pool.query(
+      `SELECT id, name, created_at
+       FROM clients
+       WHERE tenant_id = $1
+       ORDER BY name`,
+      [tenantId]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('[API] Error fetching clients:', error);
+    res.status(500).json({ error: "Failed to fetch clients" });
+  }
+});
+
+// POST /api/clients — create a new client (admin only)
+app.post("/api/clients", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { name } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "Client name is required" });
+  }
+
+  try {
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(403).json({ error: "No tenant found for user" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO clients (tenant_id, name)
+       VALUES ($1, $2)
+       RETURNING id, name, created_at`,
+      [tenantId, name.trim()]
+    );
+
+    console.log('[API] Client created by admin:', req.user.email, '- Client:', name);
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('[API] Error creating client:', error);
+
+    if (error.code === '23505') { // Unique constraint violation
+      return res.status(409).json({ error: "Client name already exists for this tenant" });
+    }
+
+    res.status(500).json({ error: "Failed to create client" });
+  }
+});
+
+// DELETE /api/clients/:id — delete a client (admin only)
+app.delete("/api/clients/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { id } = req.params;
+  const tenantId = req.user.tenantId;
+
+  try {
+    // Verify client belongs to user's tenant
+    const result = await pool.query(
+      'DELETE FROM clients WHERE id = $1 AND tenant_id = $2 RETURNING id',
+      [id, tenantId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Client not found or access denied' });
+    }
+
+    console.log('[API] Client deleted by admin:', req.user.email, '- Client ID:', id);
+    res.json({ ok: true, id });
+  } catch (error) {
+    console.error('[API] Error deleting client:', error);
+    res.status(500).json({ error: 'Failed to delete client' });
   }
 });
 

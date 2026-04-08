@@ -696,14 +696,26 @@ function getCategories(icons) {
 }
 
 /**
- * Filter icons by category and/or search query.
+ * Get unique clients from an icon list.
  */
-function filterIcons(icons, { category = "All", query = "" } = {}) {
+function getClients(icons) {
+  const clients = [...new Set(icons.map(i => i.client_name).filter(Boolean))].sort();
+  const hasUnassigned = icons.some(i => !i.client_name);
+  const result = ["All", ...clients];
+  if (hasUnassigned) result.push("Unassigned");
+  return result;
+}
+
+/**
+ * Filter icons by category, client, and/or search query.
+ */
+function filterIcons(icons, { category = "All", client = "All", query = "" } = {}) {
   const q = query.toLowerCase().trim();
   return icons.filter(icon => {
     const inCat = category === "All" || icon.category === category;
+    const inClient = client === "All" || (icon.client_name === client) || (!icon.client_name && client === "Unassigned");
     const inQuery = !q || icon.name.toLowerCase().includes(q) || icon.category.toLowerCase().includes(q) || icon.id.includes(q);
-    return inCat && inQuery;
+    return inCat && inClient && inQuery;
   });
 }
 
@@ -711,4 +723,5 @@ function filterIcons(icons, { category = "All", query = "" } = {}) {
 window.ICON_API_BASE = ICON_API_BASE;
 window.fetchIconsFromAPI = fetchIconsFromAPI;
 window.getCategories = getCategories;
+window.getClients = getClients;
 window.filterIcons = filterIcons;

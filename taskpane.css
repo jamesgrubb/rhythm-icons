@@ -759,6 +759,38 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 .form-group input:focus {
   border-color: var(--border-2);
 }
+.form-group select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  cursor: pointer;
+}
+.form-group select:focus {
+  border-color: var(--border-2);
+}
+
+/* Client selector (select + add button) */
+.client-selector {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.client-selector select {
+  flex: 1;
+}
+.client-selector .btn-secondary {
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+}
 
 /* Upload requirements notice */
 .upload-requirements {
