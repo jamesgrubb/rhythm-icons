@@ -358,6 +358,10 @@ app.get("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireR
       [tenantId]
     );
 
+    const withClients = result.rows.filter(r => r.client_name).length;
+    const uniqueClients = [...new Set(result.rows.map(r => r.client_name).filter(Boolean))];
+    console.log(`[API] Returning ${result.rows.length} icons, ${withClients} with clients. Unique clients: [${uniqueClients.join(', ')}]`);
+
     res.json(result.rows);
   } catch (error) {
     console.error('[API] Error fetching icons:', error);
@@ -438,7 +442,7 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
       [tenantId, id, name, category, svg, client_id || null]
     );
 
-    console.log('[API] Icon created by admin:', req.user.email, '- Icon ID:', id);
+    console.log('[API] Icon created by admin:', req.user.email, '- Icon ID:', id, '- Client ID:', client_id || 'none');
     res.status(201).json({ ok: true, id });
   } catch (error) {
     console.error('[API] Error creating icon:', error);

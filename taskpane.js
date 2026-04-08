@@ -1047,6 +1047,13 @@ Office.onReady(async ({ host }) => {
     allIcons = await fetchIconsFromAPI(accessToken);
     const categories = getCategories(allIcons);
     const clients = getClients(allIcons);
+
+    // Debug logging
+    console.log('[Debug] Total icons:', allIcons.length);
+    console.log('[Debug] Icons with client:', allIcons.filter(i => i.client_name).length);
+    console.log('[Debug] Unique clients:', clients);
+    console.log('[Debug] Sample icon with client:', allIcons.find(i => i.client_name));
+
     renderTabs(categories);
     renderClientTabs(clients);
     renderGrid();
