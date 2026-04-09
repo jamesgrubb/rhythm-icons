@@ -675,6 +675,14 @@ Office.onReady(async ({ host }) => {
         icon.category = newCategory;
         icon.client_id = newClientId;
 
+        // Update client_name based on selected client
+        if (newClientId) {
+          const selectedClient = allClients.find(c => c.id === newClientId);
+          icon.client_name = selectedClient ? selectedClient.name : null;
+        } else {
+          icon.client_name = null;
+        }
+
         // Re-render UI
         invalidateCountCache();
         const clients = getClients(allIcons);
