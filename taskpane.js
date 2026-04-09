@@ -597,6 +597,9 @@ Office.onReady(async ({ host }) => {
       return;
     }
 
+    // Load clients before opening modal
+    await fetchClients();
+
     // Get modal elements
     const modal = document.getElementById("edit-icon-modal");
     const svgPreview = document.getElementById("edit-icon-svg");
@@ -613,6 +616,8 @@ Office.onReady(async ({ host }) => {
     nameInput.value = icon.name;
     categoryInput.value = icon.category || '';
 
+    console.log('[Edit] Icon client_id:', icon.client_id, 'Available clients:', allClients.length);
+
     // Populate client dropdown
     clientSelect.innerHTML = '<option value="">No client</option>';
     allClients.forEach(client => {
@@ -621,6 +626,7 @@ Office.onReady(async ({ host }) => {
       option.textContent = client.name;
       if (icon.client_id === client.id) {
         option.selected = true;
+        console.log('[Edit] Selected client:', client.name);
       }
       clientSelect.appendChild(option);
     });
