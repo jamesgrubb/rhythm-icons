@@ -716,8 +716,12 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 .icon-edit-btn svg {
   width: 14px;
   height: 14px;
-  stroke: white;
-  stroke-width: 2.5;
+}
+
+.icon-edit-btn svg,
+.icon-edit-btn svg * {
+  stroke: white !important;
+  stroke-width: 2.5 !important;
 }
 
 .icon-edit-btn:hover {
