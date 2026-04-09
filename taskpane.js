@@ -249,9 +249,22 @@ Office.onReady(async ({ host }) => {
       }
 
       // Render previews - show what exists vs what's being uploaded
-      existingPreview.innerHTML = existing.svg;
+      // Strip hardcoded colors for better visibility
+      let existingSvg = existing.svg;
+      existingSvg = existingSvg.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="currentColor"');
+      existingSvg = existingSvg.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="currentColor"');
+      existingSvg = existingSvg.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
+      existingSvg = existingSvg.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
+
+      let uploadedSvg = uploaded.svg;
+      uploadedSvg = uploadedSvg.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="currentColor"');
+      uploadedSvg = uploadedSvg.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="currentColor"');
+      uploadedSvg = uploadedSvg.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
+      uploadedSvg = uploadedSvg.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
+
+      existingPreview.innerHTML = existingSvg;
       existingName.textContent = existing.name;
-      newPreview.innerHTML = uploaded.svg;
+      newPreview.innerHTML = uploadedSvg;
 
       // Show the original filename to avoid confusion
       const uploadFileName = uploaded.name;
@@ -611,7 +624,14 @@ Office.onReady(async ({ host }) => {
     const saveBtn = document.getElementById("edit-icon-save");
 
     // Populate fields with current icon data
-    svgPreview.innerHTML = icon.svg;
+    // Strip hardcoded colors so CSS styling works
+    let previewSvg = icon.svg;
+    previewSvg = previewSvg.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="currentColor"');
+    previewSvg = previewSvg.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="currentColor"');
+    previewSvg = previewSvg.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
+    previewSvg = previewSvg.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
+
+    svgPreview.innerHTML = previewSvg;
     iconIdDisplay.textContent = `ID: ${icon.id}`;
     nameInput.value = icon.name;
     categoryInput.value = icon.category || '';
@@ -2000,6 +2020,12 @@ Office.onReady(async ({ host }) => {
       // Use data URI with base64 encoding for maximum compatibility
       try {
         let svgData = icon.svg.trim();
+
+        // Strip hardcoded colors to make icons light gray
+        svgData = svgData.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="#999"');
+        svgData = svgData.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="#999"');
+        svgData = svgData.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
+        svgData = svgData.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
 
         // Ensure proper xmlns
         if (!svgData.includes('xmlns=')) {

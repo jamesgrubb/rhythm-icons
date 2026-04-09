@@ -653,9 +653,10 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   color: white;
   border: none;
   border-radius: 4px; /* Rounded square to match edit button */
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 22px; /* Match height for perfect centering */
+  font-family: Arial, sans-serif;
   cursor: pointer;
   transition: all 0.15s var(--ease);
   opacity: 0;
@@ -715,6 +716,7 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 .icon-edit-btn svg {
   width: 14px;
   height: 14px;
+  stroke: white;
   stroke-width: 2.5;
 }
 
