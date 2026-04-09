@@ -59,7 +59,6 @@ Office.onReady(async ({ host }) => {
   const uploadModal          = document.getElementById("upload-modal");
   const closeUpload          = document.getElementById("close-upload");
   const svgFileInput         = document.getElementById("svg-file-input");
-  const iconCategoryInput    = document.getElementById("icon-category");
   const previewSection       = document.getElementById("preview-section");
   const previewGrid          = document.getElementById("preview-grid");
   const previewCount         = document.getElementById("preview-count");
@@ -616,9 +615,7 @@ Office.onReady(async ({ host }) => {
     // Get modal elements
     const modal = document.getElementById("edit-icon-modal");
     const svgPreview = document.getElementById("edit-icon-svg");
-    const iconIdDisplay = document.getElementById("edit-icon-id");
     const nameInput = document.getElementById("edit-icon-name");
-    const categoryInput = document.getElementById("edit-icon-category");
     const clientSelect = document.getElementById("edit-icon-client");
     const cancelBtn = document.getElementById("edit-icon-cancel");
     const saveBtn = document.getElementById("edit-icon-save");
@@ -632,9 +629,7 @@ Office.onReady(async ({ host }) => {
     previewSvg = previewSvg.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
 
     svgPreview.innerHTML = previewSvg;
-    iconIdDisplay.textContent = `ID: ${icon.id}`;
     nameInput.value = icon.name;
-    categoryInput.value = icon.category || '';
 
     console.log('[Edit] Icon client_id:', icon.client_id, 'Available clients:', allClients.length);
 
@@ -664,7 +659,6 @@ Office.onReady(async ({ host }) => {
     // Handle save
     const onSave = async () => {
       const newName = nameInput.value.trim();
-      const newCategory = categoryInput.value.trim();
       const newClientId = clientSelect.value || null;
 
       if (!newName) {
@@ -677,7 +671,6 @@ Office.onReady(async ({ host }) => {
         const payload = {
           id: icon.id,
           name: newName,
-          category: newCategory,
           svg: icon.svg, // Keep existing SVG
           client_id: newClientId
         };
@@ -698,7 +691,6 @@ Office.onReady(async ({ host }) => {
 
         // Update local icon object
         icon.name = newName;
-        icon.category = newCategory;
         icon.client_id = newClientId;
 
         // Update client_name based on selected client
@@ -1815,7 +1807,6 @@ Office.onReady(async ({ host }) => {
 
     if (files.length === 0) return;
 
-    const category = iconCategoryInput.value || "Custom";
     uploadedIcons = [];
     const failedFiles = []; // Track validation failures
 
@@ -1936,7 +1927,6 @@ Office.onReady(async ({ host }) => {
         uploadedIcons.push({
           id: iconId,
           name: iconName.charAt(0).toUpperCase() + iconName.slice(1),
-          category: category,
           svg: svgContent
         });
 
@@ -2065,7 +2055,6 @@ Office.onReady(async ({ host }) => {
   copyCodeBtn.addEventListener("click", async () => {
     if (uploadedIcons.length === 0) return;
 
-    const category = iconCategoryInput.value.trim() || "Custom";
     const selectedClientId = iconClientSelect.value || null;
 
     copyCodeBtn.disabled = true;
@@ -2079,7 +2068,7 @@ Office.onReady(async ({ host }) => {
     try {
       // Process each icon
       for (const icon of uploadedIcons) {
-        let iconToUpload = { ...icon, category };
+        let iconToUpload = { ...icon };
         let shouldUpload = true;
         let isUpdate = false;
 
@@ -2130,12 +2119,11 @@ Office.onReady(async ({ host }) => {
           const payload = {
             id: iconToUpload.id,
             name: iconToUpload.name,
-            category: iconToUpload.category,
             svg: iconToUpload.svg,
             client_id: clientIdToSend
           };
 
-          console.log(`[Upload] Sending to API:`, { id: payload.id, name: payload.name, category: payload.category });
+          console.log(`[Upload] Sending to API:`, { id: payload.id, name: payload.name });
 
           const res = await fetch(`${ICON_API_BASE}/icons`, {
             method: 'POST',
@@ -2177,7 +2165,6 @@ Office.onReady(async ({ host }) => {
       uploadedIcons = [];
       previewSection.classList.add("hidden");
       svgFileInput.value = "";
-      iconCategoryInput.value = "Custom";
 
     } catch (error) {
       console.error("[Upload] Error:", error);

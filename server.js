@@ -401,8 +401,8 @@ app.get("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
 app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
   const { id, name, category, svg, client_id } = req.body;
 
-  if (!id || !name || !category || !svg) {
-    return res.status(400).json({ error: "Missing required fields: id, name, category, svg" });
+  if (!id || !name || !svg) {
+    return res.status(400).json({ error: "Missing required fields: id, name, svg" });
   }
 
   // VALIDATE SVG CONTENT
@@ -447,7 +447,7 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
          client_id = EXCLUDED.client_id,
          updated_at = CURRENT_TIMESTAMP
        RETURNING (xmax = 0) AS inserted`,
-      [tenantId, id, name, category, svg, client_id || null]
+      [tenantId, id, name, category || 'Uncategorized', svg, client_id || null]
     );
 
     const wasInserted = result.rows[0].inserted;

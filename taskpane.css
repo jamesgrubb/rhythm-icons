@@ -1008,13 +1008,6 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   stroke: var(--text-2);
 }
 
-.edit-icon-id {
-  font-size: 10px;
-  color: var(--text-3);
-  font-family: 'Courier New', monospace;
-  margin: 0;
-}
-
 .form-group {
   margin-bottom: 16px;
 }
