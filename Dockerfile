@@ -14,9 +14,11 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Install dependencies first (better layer caching)
+# Install dependencies first (better layer caching).
+# --ignore-scripts: the postinstall hook runs webpack, which needs the
+# source files that aren't copied yet — the explicit build below covers it.
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy source and build frontend bundle
 COPY . .
