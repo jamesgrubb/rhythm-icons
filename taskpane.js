@@ -2279,6 +2279,8 @@ Office.onReady(async ({ host }) => {
         </div>
         <p class="ss-desc" title="${img.description.replace(/"/g, "&quot;")}">${img.description}</p>
       `;
+      const desc = card.querySelector(".ss-desc");
+      if (desc) desc.addEventListener("click", () => desc.classList.toggle("expanded"));
       if (currentUserRole === 'admin') {
         const btn = document.createElement("button");
         btn.className = "btn-primary ss-ingest-btn";

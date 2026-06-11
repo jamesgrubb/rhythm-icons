@@ -1351,8 +1351,10 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 
 .ss-results {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
+  /* Single column: sheet previews hold many icons and need full pane width
+     to be legible before an admin commits a license to one */
+  grid-template-columns: 1fr;
+  gap: 14px;
 }
 
 .ss-card {
@@ -1401,13 +1403,20 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 }
 
 .ss-desc {
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--text-2);
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  cursor: pointer;
+}
+
+.ss-desc.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
 }
 
 .ss-ingest-btn { font-size: 11px; padding: 6px 8px; }
