@@ -1532,6 +1532,7 @@ Office.onReady(async ({ host }) => {
     const adminPanelBtn = document.getElementById('admin-panel-btn');
 
     // Show/hide buttons based on role
+    const shutterstockBtn = document.getElementById('shutterstock-btn');
     if (currentUserRole === 'admin') {
       if (uploadBtn) uploadBtn.style.display = 'flex';
       if (editModeBtn) editModeBtn.style.display = 'flex';
@@ -1541,6 +1542,9 @@ Office.onReady(async ({ host }) => {
       if (editModeBtn) editModeBtn.style.display = 'none';
       if (adminPanelBtn) adminPanelBtn.style.display = 'none';
     }
+    // Shutterstock search is open to all signed-in roles;
+    // licensing/ingest inside the panel stays admin-only
+    if (shutterstockBtn) shutterstockBtn.style.display = currentUserRole ? 'flex' : 'none';
 
     // Update header with user info
     const userInfoContainer = document.getElementById('user-info-container');
@@ -2174,6 +2178,307 @@ Office.onReady(async ({ host }) => {
       copyCodeBtn.textContent = "Upload to Library";
     }
   });
+
+  // =============================================
+  //  SHUTTERSTOCK INTEGRATION (admin curation pipeline)
+  //  Search → License & Ingest → poll job → review → POST /api/icons
+  // =============================================
+  const ssBtn        = document.getElementById("shutterstock-btn");
+  const ssPanel      = document.getElementById("shutterstock-panel");
+  const ssSearchIn   = document.getElementById("ss-search-input");
+  const ssSearchBtn  = document.getElementById("ss-search-btn");
+  const ssResults    = document.getElementById("ss-results");
+  const ssStatus     = document.getElementById("ss-status");
+  const ssPager      = document.getElementById("ss-pager");
+  const ssPrev       = document.getElementById("ss-prev");
+  const ssNext       = document.getElementById("ss-next");
+  const ssPageLabel  = document.getElementById("ss-page-label");
+  const ssReviewModal   = document.getElementById("ss-review-modal");
+  const ssReviewGrid    = document.getElementById("ss-review-grid");
+  const ssReviewClient  = document.getElementById("ss-review-client");
+  const ssReviewCancel  = document.getElementById("ss-review-cancel");
+  const ssReviewApprove = document.getElementById("ss-review-approve");
+
+  let ssOpen = false;
+  let ssPage = 1;
+  let ssQuery = "";
+  let ssActivePollTimer = null;
+  let ssReviewJobId = null;
+  let ssCandidates = [];
+
+  function ssSetStatus(msg, isError) {
+    if (!msg) {
+      ssStatus.classList.add("hidden");
+      return;
+    }
+    ssStatus.textContent = msg;
+    ssStatus.classList.toggle("ss-status-error", !!isError);
+    ssStatus.classList.remove("hidden");
+  }
+
+  function toggleShutterstockPanel(open) {
+    ssOpen = open !== undefined ? open : !ssOpen;
+    ssPanel.classList.toggle("hidden", !ssOpen);
+    // Hide the curated grid + its option bars while searching Shutterstock
+    ["icon-grid", "size-bar", "color-bar", "background-bar", "empty-state", "tag-filter-section"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = ssOpen ? "none" : "";
+    });
+    if (ssBtn) ssBtn.classList.toggle("active", ssOpen);
+    if (ssOpen) {
+      // Non-admins can search/browse but licensing is an admin action
+      const hint = ssPanel.querySelector(".ss-hint");
+      if (hint && currentUserRole !== 'admin') {
+        hint.textContent = "Vector results only. Found something useful? Ask an admin to license it into the library.";
+      }
+      ssSearchIn.focus();
+    }
+  }
+
+  async function ssSearch(page = 1) {
+    const query = ssSearchIn.value.trim();
+    if (!query) return;
+    ssQuery = query;
+    ssPage = page;
+    ssSetStatus("Searching Shutterstock…");
+    ssResults.innerHTML = "";
+    ssPager.classList.add("hidden");
+
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/shutterstock/search?query=${encodeURIComponent(query)}&page=${page}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || body.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      ssSetStatus(null);
+      renderSsResults(data);
+    } catch (err) {
+      console.error("[Shutterstock] Search failed:", err);
+      ssSetStatus(`Search failed: ${err.message}`, true);
+    }
+  }
+
+  function renderSsResults(data) {
+    ssResults.innerHTML = "";
+    if (!data.results || data.results.length === 0) {
+      ssSetStatus(`No vector results for "${ssQuery}"`);
+      return;
+    }
+
+    data.results.forEach(img => {
+      const card = document.createElement("div");
+      card.className = "ss-card";
+      card.innerHTML = `
+        <div class="ss-thumb-wrap">
+          ${img.preview_url ? `<img class="ss-thumb" src="${img.preview_url}" alt="" loading="lazy" />` : '<div class="ss-thumb ss-thumb-missing">No preview</div>'}
+          <span class="ss-badge">Vector</span>
+        </div>
+        <p class="ss-desc" title="${img.description.replace(/"/g, "&quot;")}">${img.description}</p>
+      `;
+      if (currentUserRole === 'admin') {
+        const btn = document.createElement("button");
+        btn.className = "btn-primary ss-ingest-btn";
+        btn.textContent = "License & Ingest";
+        btn.addEventListener("click", () => ssIngest(img.id, card, btn));
+        card.appendChild(btn);
+      } else {
+        const note = document.createElement("p");
+        note.className = "ss-admin-note";
+        note.textContent = "Ask an admin to license this icon";
+        card.appendChild(note);
+      }
+      ssResults.appendChild(card);
+    });
+
+    const totalPages = Math.max(1, Math.ceil((data.total_count || 0) / (data.per_page || 24)));
+    ssPageLabel.textContent = `Page ${ssPage} of ${Math.min(totalPages, 999)}`;
+    ssPrev.disabled = ssPage <= 1;
+    ssNext.disabled = ssPage >= totalPages;
+    ssPager.classList.remove("hidden");
+  }
+
+  async function ssIngest(imageId, card, btn) {
+    const confirmed = await customConfirm(
+      "Licensing this image will consume a Shutterstock plan credit (unless already licensed). Continue?",
+      "License Image"
+    );
+    if (!confirmed) return;
+
+    btn.disabled = true;
+    btn.textContent = "Starting…";
+    const progress = document.createElement("div");
+    progress.className = "ss-progress";
+    card.appendChild(progress);
+
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/shutterstock/ingest`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ image_id: imageId })
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || body.error || `HTTP ${res.status}`);
+      }
+      const { job_id } = await res.json();
+      ssPollJob(job_id, btn, progress);
+    } catch (err) {
+      console.error("[Shutterstock] Ingest failed:", err);
+      progress.textContent = `Failed: ${err.message}`;
+      progress.classList.add("ss-progress-error");
+      btn.disabled = false;
+      btn.textContent = "License & Ingest";
+    }
+  }
+
+  const SS_STATUS_LABELS = {
+    queued: "Queued…",
+    licensing: "Licensing image…",
+    downloading: "Downloading EPS…",
+    converting: "Converting to PNG + SVG…",
+    segmenting: "AI segmenting & naming icons…",
+    review_ready: "Ready for review",
+    failed: "Failed",
+    done: "Done"
+  };
+
+  function ssPollJob(jobId, btn, progress) {
+    if (ssActivePollTimer) clearInterval(ssActivePollTimer);
+
+    ssActivePollTimer = setInterval(async () => {
+      try {
+        const token = await getAccessToken();
+        const res = await fetch(`${ICON_API_BASE}/shutterstock/jobs/${jobId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const job = await res.json();
+
+        progress.textContent = `${SS_STATUS_LABELS[job.status] || job.status} (${job.progress}%)`;
+
+        if (job.status === "review_ready") {
+          clearInterval(ssActivePollTimer);
+          ssActivePollTimer = null;
+          btn.textContent = "Ingested";
+          openSsReview(jobId, job.results || []);
+        } else if (job.status === "failed") {
+          clearInterval(ssActivePollTimer);
+          ssActivePollTimer = null;
+          progress.textContent = `Failed: ${job.error || "unknown error"}`;
+          progress.classList.add("ss-progress-error");
+          btn.disabled = false;
+          btn.textContent = "Retry";
+        }
+      } catch (err) {
+        console.warn("[Shutterstock] Poll error (will retry):", err.message);
+      }
+    }, 3000);
+  }
+
+  async function openSsReview(jobId, candidates) {
+    ssReviewJobId = jobId;
+    ssCandidates = candidates;
+
+    // Populate client dropdown (same data the edit modal uses)
+    await fetchClients();
+    ssReviewClient.innerHTML = '<option value="">No client</option>';
+    allClients.forEach(client => {
+      const opt = document.createElement("option");
+      opt.value = client.id;
+      opt.textContent = client.name;
+      ssReviewClient.appendChild(opt);
+    });
+
+    ssReviewGrid.innerHTML = "";
+    candidates.forEach((cand, idx) => {
+      const ok = cand.stroke_status === "valid";
+      const item = document.createElement("div");
+      item.className = "ss-review-item" + (ok ? "" : " ss-review-blocked");
+      item.innerHTML = `
+        <label class="ss-review-check">
+          <input type="checkbox" data-idx="${idx}" ${ok ? "checked" : "disabled"} />
+        </label>
+        <div class="ss-review-preview">${cand.svg}</div>
+        <input type="text" class="confirm-input ss-review-name" data-idx="${idx}" value="${cand.name.replace(/"/g, "&quot;")}" ${ok ? "" : "disabled"} />
+        <span class="ss-review-badge ss-badge-${cand.stroke_status}">${
+          cand.stroke_status === "valid" ? "Stroke ✓" :
+          cand.stroke_status === "outlined" ? "Outlined ✕" : "Mixed ?"
+        }</span>
+      `;
+      ssReviewGrid.appendChild(item);
+    });
+
+    ssReviewModal.classList.remove("hidden");
+  }
+
+  async function ssApproveSelected() {
+    const checks = ssReviewGrid.querySelectorAll('input[type="checkbox"]:checked');
+    if (checks.length === 0) {
+      showToast("Nothing selected");
+      return;
+    }
+
+    ssReviewApprove.disabled = true;
+    ssReviewApprove.textContent = "Adding…";
+    const clientId = ssReviewClient.value || null;
+    let added = 0, failed = 0;
+
+    try {
+      const token = await getAccessToken();
+
+      for (const check of checks) {
+        const idx = Number(check.dataset.idx);
+        const cand = ssCandidates[idx];
+        const nameInput = ssReviewGrid.querySelector(`.ss-review-name[data-idx="${idx}"]`);
+        const name = (nameInput?.value || cand.name).trim();
+        const iconId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+        const res = await fetch(`${ICON_API_BASE}/icons`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ id: iconId, name, svg: cand.svg, category: "Shutterstock", client_id: clientId })
+        });
+
+        if (res.ok) {
+          added++;
+        } else {
+          failed++;
+          console.error(`[Shutterstock] Failed to add "${name}":`, await res.text());
+        }
+      }
+
+      // Mark job done and refresh the curated library
+      await fetch(`${ICON_API_BASE}/shutterstock/jobs/${ssReviewJobId}/complete`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {});
+
+      await loadIcons(token);
+      ssReviewModal.classList.add("hidden");
+      showToast(`${added} icon${added !== 1 ? "s" : ""} added${failed ? `, ${failed} failed` : ""}`);
+    } catch (err) {
+      console.error("[Shutterstock] Approve failed:", err);
+      showToast("Failed to add icons");
+    } finally {
+      ssReviewApprove.disabled = false;
+      ssReviewApprove.textContent = "Add Selected to Library";
+    }
+  }
+
+  if (ssBtn) {
+    ssBtn.addEventListener("click", () => toggleShutterstockPanel());
+    ssSearchBtn.addEventListener("click", () => ssSearch(1));
+    ssSearchIn.addEventListener("keydown", (e) => { if (e.key === "Enter") ssSearch(1); });
+    ssPrev.addEventListener("click", () => ssSearch(ssPage - 1));
+    ssNext.addEventListener("click", () => ssSearch(ssPage + 1));
+    ssReviewCancel.addEventListener("click", () => ssReviewModal.classList.add("hidden"));
+    ssReviewApprove.addEventListener("click", ssApproveSelected);
+  }
 
   await bootstrap();
 });

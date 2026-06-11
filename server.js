@@ -397,6 +397,53 @@ app.get("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
   }
 });
 
+// ---- Stroke weight validation ----
+// Library convention is an effective stroke-width of 2 (viewBox units) so all
+// icons render with a consistent line weight in documents. Effective width =
+// declared stroke-width × any scale() transform applied above the element.
+const STROKE_WEIGHT_TARGET = 2;
+const STROKE_WEIGHT_TOLERANCE = 0.5;
+
+function checkStrokeWeight(svg) {
+  const widths = [];
+  for (const m of svg.matchAll(/stroke-width=["']([^"']+)["']/g)) {
+    const w = parseFloat(m[1]);
+    if (!isNaN(w)) widths.push(w);
+  }
+  for (const m of svg.matchAll(/stroke-width:\s*([\d.]+)/g)) {
+    const w = parseFloat(m[1]);
+    if (!isNaN(w)) widths.push(w);
+  }
+
+  if (widths.length === 0) {
+    return {
+      ok: false,
+      error: `SVG has no stroke-width - icons must declare stroke-width so they render at weight ${STROKE_WEIGHT_TARGET} (e.g. stroke-width="2")`
+    };
+  }
+
+  // Single uniform scale() transform (the shape our ingestion pipeline emits).
+  // Multiple differing scales can't be checked reliably with regex - allow them
+  // through only if the raw widths already pass.
+  const scaleMatches = [...svg.matchAll(/scale\(\s*(-?\d*\.?\d+)/g)].map(m => Math.abs(parseFloat(m[1])));
+  const scale = scaleMatches.length === 1 ? scaleMatches[0] : 1;
+
+  const min = STROKE_WEIGHT_TARGET - STROKE_WEIGHT_TOLERANCE;
+  const max = STROKE_WEIGHT_TARGET + STROKE_WEIGHT_TOLERANCE;
+  const offWeights = widths
+    .map(w => +(w * scale).toFixed(2))
+    .filter(eff => eff < min || eff > max);
+
+  if (offWeights.length > 0) {
+    return {
+      ok: false,
+      error: `Stroke weight out of range: effective width ${offWeights.join(", ")} - must be ${min}-${max} so icons render in line with the library (target ${STROKE_WEIGHT_TARGET})`
+    };
+  }
+
+  return { ok: true };
+}
+
 // POST /api/icons — add a new icon (admin only)
 app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
   const { id, name, category, svg, client_id } = req.body;
@@ -427,6 +474,14 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
     return res.status(400).json({
       error: "SVG contains fill attributes - only stroke-based icons allowed"
     });
+  }
+
+  // 3. Check stroke weight renders in line with the library convention (2 ± 0.5).
+  // Ingested icons carry a scale() transform with a compensated stroke-width,
+  // so the effective width is stroke-width × scale.
+  const strokeCheck = checkStrokeWeight(svg);
+  if (!strokeCheck.ok) {
+    return res.status(400).json({ error: strokeCheck.error });
   }
 
   try {
@@ -571,6 +626,82 @@ app.delete("/api/clients/:id", requireAuth, ensureTenantExists, extractUserRole,
   }
 });
 
+// =============================================
+// SHUTTERSTOCK INTEGRATION ENDPOINTS
+// Search is open to all signed-in roles; licensing/ingest stays admin-only
+// =============================================
+const shutterstock = require("./lib/shutterstock");
+const ingestJobs = require("./lib/jobs");
+
+// GET /api/shutterstock/search?query=&page= — proxy Shutterstock vector search
+app.get("/api/shutterstock/search", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin', 'user', 'viewer'), async (req, res) => {
+  const { query, page } = req.query;
+
+  if (!query || !query.trim()) {
+    return res.status(400).json({ error: "Missing required parameter: query" });
+  }
+
+  try {
+    const results = await shutterstock.searchVectors({
+      query: query.trim(),
+      page: Math.max(1, parseInt(page, 10) || 1),
+    });
+    console.log(`[Shutterstock] Search "${query}" page ${page || 1} → ${results.results.length} results (${req.user.dbRole}: ${req.user.email})`);
+    res.json(results);
+  } catch (error) {
+    console.error('[Shutterstock] Search error:', error.message);
+    const status = error.message.includes("not configured") ? 503 : (error.status === 401 ? 502 : 500);
+    res.status(status).json({ error: "Shutterstock search failed", detail: error.message });
+  }
+});
+
+// POST /api/shutterstock/ingest — license an image and start the ingestion pipeline
+app.post("/api/shutterstock/ingest", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { image_id } = req.body;
+
+  if (!image_id) {
+    return res.status(400).json({ error: "Missing required field: image_id" });
+  }
+
+  try {
+    const job = await ingestJobs.createIngestJob({
+      tenantId: req.user.tenantId,
+      imageId: String(image_id),
+      createdBy: req.user.email || req.user.preferred_username,
+    });
+    console.log(`[Shutterstock] Ingest job ${job.id} created for image ${image_id} by ${req.user.email}`);
+    res.status(202).json({ job_id: job.id, status: job.status });
+  } catch (error) {
+    console.error('[Shutterstock] Ingest error:', error.message);
+    res.status(500).json({ error: "Failed to start ingestion", detail: error.message });
+  }
+});
+
+// GET /api/shutterstock/jobs/:id — poll job status (tenant-scoped)
+app.get("/api/shutterstock/jobs/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  try {
+    const job = await ingestJobs.getJob(req.params.id, req.user.tenantId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    res.json(job);
+  } catch (error) {
+    console.error('[Shutterstock] Job fetch error:', error.message);
+    res.status(500).json({ error: "Failed to fetch job" });
+  }
+});
+
+// POST /api/shutterstock/jobs/:id/complete — mark a reviewed job as done
+app.post("/api/shutterstock/jobs/:id/complete", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  try {
+    await ingestJobs.markJobDone(req.params.id, req.user.tenantId);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('[Shutterstock] Job complete error:', error.message);
+    res.status(500).json({ error: "Failed to update job" });
+  }
+});
+
 // PUT /api/icons/:id — update an existing icon (admin only)
 app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
   const { id } = req.params;
@@ -650,6 +781,9 @@ async function startServer() {
       process.exit(1);
     }
   }
+
+  // Fail any ingest jobs orphaned by a previous shutdown (in-process worker)
+  await ingestJobs.failStaleJobs();
 
   app.listen(PORT, () => {
     console.log(`[Server] Running on port ${PORT}`);

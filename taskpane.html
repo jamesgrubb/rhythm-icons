@@ -52,6 +52,12 @@
             <div id="user-info-container" class="user-info-container"></div>
           </div>
           <div class="header-actions">
+            <button id="shutterstock-btn" class="btn-ghost" title="Search Shutterstock" style="display: none;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M21 21l-4.35-4.35M8 11h6M11 8v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </button>
             <button id="upload-btn" class="btn-ghost" title="Bulk upload SVG icons" style="display: none;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -236,6 +242,22 @@
           </div>
         </div>
 
+        <!-- SHUTTERSTOCK SEARCH PANEL (admin curation pipeline) -->
+        <div id="shutterstock-panel" class="shutterstock-panel hidden">
+          <div class="ss-search-wrap">
+            <input id="ss-search-input" type="text" placeholder="Search Shutterstock vectors…" autocomplete="off" />
+            <button id="ss-search-btn" class="btn-primary">Search</button>
+          </div>
+          <p class="ss-hint">Vector results only. Licensing an image consumes a plan credit; icons are AI-segmented for review before joining the library.</p>
+          <div id="ss-status" class="ss-status hidden"></div>
+          <div id="ss-results" class="ss-results"></div>
+          <div class="ss-pager hidden" id="ss-pager">
+            <button id="ss-prev" class="btn-secondary">Prev</button>
+            <span id="ss-page-label"></span>
+            <button id="ss-next" class="btn-secondary">Next</button>
+          </div>
+        </div>
+
         <div id="icon-grid"></div>
         <div id="empty-state" class="empty-state hidden">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" opacity="0.3">
@@ -385,6 +407,28 @@
         <div class="modal-actions">
           <button id="edit-icon-cancel" class="btn-secondary">Cancel</button>
           <button id="edit-icon-save" class="btn-primary">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHUTTERSTOCK REVIEW MODAL -->
+    <div id="ss-review-modal" class="modal-overlay hidden">
+      <div class="modal-dialog ss-review-dialog">
+        <h3>Review Extracted Icons</h3>
+        <p class="ss-review-sub">Approve stroke-based icons to add them to your library. Outlined (filled) icons can't be themed and are blocked.</p>
+
+        <div class="form-group">
+          <label for="ss-review-client">Assign to client</label>
+          <select id="ss-review-client" class="confirm-input">
+            <option value="">No client</option>
+          </select>
+        </div>
+
+        <div id="ss-review-grid" class="ss-review-grid"></div>
+
+        <div class="modal-actions">
+          <button id="ss-review-cancel" class="btn-secondary">Discard All</button>
+          <button id="ss-review-approve" class="btn-primary">Add Selected to Library</button>
         </div>
       </div>
     </div>
