@@ -769,7 +769,8 @@ async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     console.log('[Database] Running migrations...');
     const knex = require('knex');
-    const knexConfig = require('./db/knexfile');
+    // knexfile exports per-environment configs; knex() needs exactly one
+    const knexConfig = require('./db/knexfile').production;
     const db = knex(knexConfig);
 
     try {
