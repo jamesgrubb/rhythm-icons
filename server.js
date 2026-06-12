@@ -369,6 +369,34 @@ app.get("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireR
   }
 });
 
+// POST /api/icons/ai-search — natural-language search over the library.
+// Gemini maps the query to icon ids by meaning (synonyms, concepts), not
+// literal text. Catalog is small, so it ships whole in one prompt.
+app.post("/api/icons/ai-search", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin', 'user', 'viewer'), async (req, res) => {
+  const query = String(req.body?.query || "").trim();
+  if (!query) {
+    return res.status(400).json({ error: "Missing required field: query" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT icon_id as id, name, category, tags
+       FROM icons
+       WHERE tenant_id = $1 OR is_public = true`,
+      [req.user.tenantId]
+    );
+
+    const gemini = require("./lib/gemini");
+    const ids = await gemini.matchIcons(query, result.rows);
+    console.log(`[AI Search] "${query}" → ${ids.length}/${result.rows.length} icons (${req.user.dbRole})`);
+    res.json({ ids });
+  } catch (error) {
+    console.error('[AI Search] Error:', error.message);
+    const status = error.message.includes("not configured") ? 503 : 500;
+    res.status(status).json({ error: "AI search failed", detail: error.message });
+  }
+});
+
 // GET /api/icons/:id — fetch a single icon
 app.get("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin', 'user', 'viewer'), async (req, res) => {
   try {

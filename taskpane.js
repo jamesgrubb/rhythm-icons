@@ -495,7 +495,17 @@ Office.onReady(async ({ host }) => {
   }
 
   function renderGrid() {
-    const visible = filterIcons(allIcons, { client: activeClient, query: activeQuery });
+    let visible;
+    if (aiSearchIds) {
+      // AI search active: show Gemini's matches in relevance order,
+      // still respecting the active client tab
+      const rank = new Map(aiSearchIds.map((id, i) => [id, i]));
+      visible = filterIcons(allIcons, { client: activeClient, query: "" })
+        .filter(icon => rank.has(icon.id))
+        .sort((a, b) => rank.get(a.id) - rank.get(b.id));
+    } else {
+      visible = filterIcons(allIcons, { client: activeClient, query: activeQuery });
+    }
     resultCount.textContent = `${visible.length} icon${visible.length !== 1 ? "s" : ""}`;
 
     if (visible.length === 0) {
@@ -1366,9 +1376,53 @@ Office.onReady(async ({ host }) => {
   }
 
   // ---- Search ----
+  // Typing filters locally (name/category/tags substring). Pressing Enter
+  // runs AI search: Gemini maps the phrase to icons by meaning.
+  let aiSearchIds = null;
+  const aiChip = document.getElementById("ai-search-chip");
+  const aiChipLabel = document.getElementById("ai-search-label");
+  const aiChipClear = document.getElementById("ai-search-clear");
+
+  function clearAiSearch({ rerender = true } = {}) {
+    if (!aiSearchIds && aiChip.classList.contains("hidden")) return;
+    aiSearchIds = null;
+    aiChip.classList.add("hidden");
+    if (rerender) {
+      renderClientTabs(getClients(allIcons));
+      renderGrid();
+    }
+  }
+
+  async function runAiSearch(query) {
+    aiChip.classList.remove("hidden");
+    aiChipLabel.textContent = `✨ Searching "${query}"…`;
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/icons/ai-search`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query })
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || body.error || `HTTP ${res.status}`);
+      }
+      const { ids } = await res.json();
+      aiSearchIds = ids || [];
+      aiChipLabel.textContent = `✨ "${query}" — ${aiSearchIds.length} match${aiSearchIds.length !== 1 ? "es" : ""}`;
+      renderClientTabs(getClients(allIcons));
+      renderGrid();
+    } catch (err) {
+      console.error("[AI Search] Failed:", err);
+      aiChipLabel.textContent = `AI search failed — showing text matches`;
+      setTimeout(() => { if (!aiSearchIds) aiChip.classList.add("hidden"); }, 2500);
+    }
+  }
+
   searchInput.addEventListener("input", () => {
     activeQuery = searchInput.value;
     clearSearch.classList.toggle("hidden", !activeQuery);
+    clearAiSearch({ rerender: false }); // typing returns to instant local filtering
 
     // Refresh client tabs to update counts based on search
     const clients = getClients(allIcons);
@@ -1377,11 +1431,20 @@ Office.onReady(async ({ host }) => {
     renderGrid();
   });
 
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && searchInput.value.trim()) {
+      runAiSearch(searchInput.value.trim());
+    }
+  });
+
+  aiChipClear.addEventListener("click", () => clearAiSearch());
+
   clearSearch.addEventListener("click", () => {
     searchInput.value = "";
     activeQuery = "";
     clearSearch.classList.add("hidden");
     searchInput.focus();
+    clearAiSearch({ rerender: false });
 
     // Refresh client tabs to show full counts
     const clients = getClients(allIcons);
@@ -2220,7 +2283,7 @@ Office.onReady(async ({ host }) => {
     ssOpen = open !== undefined ? open : !ssOpen;
     ssPanel.classList.toggle("hidden", !ssOpen);
     // Hide the curated grid + its option bars while searching Shutterstock
-    ["icon-grid", "size-bar", "color-bar", "background-bar", "empty-state", "tag-filter-section"].forEach(id => {
+    ["icon-grid", "size-bar", "color-bar", "background-bar", "empty-state", "ai-search-chip"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = ssOpen ? "none" : "";
     });

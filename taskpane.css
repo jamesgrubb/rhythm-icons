@@ -1421,6 +1421,41 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 
 .ss-ingest-btn { font-size: 11px; padding: 6px 8px; }
 
+/* Active AI search indicator chip */
+.ai-search-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(232, 255, 90, 0.08);
+  border: 1px solid rgba(232, 255, 90, 0.35);
+  font-size: 11px;
+  color: var(--accent);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.ai-search-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-search-chip button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ai-search-chip.hidden { display: none; }
+
 /* Manual EPS sheet upload (admin) */
 .ss-upload-row {
   display: flex;
