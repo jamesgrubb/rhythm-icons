@@ -708,21 +708,24 @@ function getClients(icons) {
 
 /**
  * Filter icons by client and/or search query.
- * Search includes: icon name, category, ID, and client name.
+ * Search includes: icon name, category, ID, client name, and AI tags.
  */
 function filterIcons(icons, { client = "All", query = "" } = {}) {
   const q = query.toLowerCase().trim();
   return icons.filter(icon => {
     const inClient = client === "All" || (icon.client_name === client) || (!icon.client_name && client === "Unassigned");
     const clientName = (icon.client_name || "").toLowerCase();
+    // AI tags: match when every query word hits a tag, so natural phrases
+    // like "time tracking" find clock/stopwatch icons
+    const tags = (icon.tags || []).map(t => String(t).toLowerCase()).join(" ");
+    const queryWords = q.split(/\s+/).filter(Boolean);
+    const tagsMatch = queryWords.length > 0 && queryWords.every(w => tags.includes(w));
     const inQuery = !q ||
                     icon.name.toLowerCase().includes(q) ||
                     icon.category.toLowerCase().includes(q) ||
                     icon.id.includes(q) ||
-                    clientName.includes(q);
-    // TODO: Add tag search when implemented:
-    // const tags = (icon.tags || []).map(t => t.toLowerCase()).join(" ");
-    // ... || tags.includes(q)
+                    clientName.includes(q) ||
+                    tagsMatch;
     return inClient && inQuery;
   });
 }

@@ -1421,6 +1421,36 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 
 .ss-ingest-btn { font-size: 11px; padding: 6px 8px; }
 
+/* Manual EPS sheet upload (admin) */
+.ss-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#ss-upload-btn { font-size: 11px; padding: 6px 10px; flex-shrink: 0; }
+
+.ss-upload-hint {
+  font-size: 10px;
+  color: var(--text-3);
+  line-height: 1.35;
+}
+
+/* Name + tags stacked in review rows */
+.ss-review-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ss-review-tags {
+  font-size: 10px;
+  color: var(--text-2);
+}
+
 /* Shown to non-admins in place of the License & Ingest button */
 .ss-admin-note {
   font-size: 10px;

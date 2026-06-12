@@ -2226,12 +2226,47 @@ Office.onReady(async ({ host }) => {
     });
     if (ssBtn) ssBtn.classList.toggle("active", ssOpen);
     if (ssOpen) {
-      // Non-admins can search/browse but licensing is an admin action
+      // Non-admins can search/browse but licensing/uploading are admin actions
       const hint = ssPanel.querySelector(".ss-hint");
       if (hint && currentUserRole !== 'admin') {
         hint.textContent = "Vector results only. Found something useful? Ask an admin to license it into the library.";
       }
+      const uploadRow = document.getElementById("ss-upload-row");
+      if (uploadRow) uploadRow.style.display = currentUserRole === 'admin' ? "flex" : "none";
       ssSearchIn.focus();
+    }
+  }
+
+  // ---- Manual EPS sheet upload (works around API catalog limits) ----
+  async function ssUploadFile(file) {
+    const uploadBtn = document.getElementById("ss-upload-btn");
+    const progress = document.getElementById("ss-upload-progress");
+    progress.classList.remove("hidden", "ss-progress-error");
+    progress.textContent = `Uploading "${file.name}"…`;
+    uploadBtn.disabled = true;
+
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/shutterstock/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/octet-stream",
+          "X-Filename": encodeURIComponent(file.name)
+        },
+        body: file
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || body.error || `HTTP ${res.status}`);
+      }
+      const { job_id } = await res.json();
+      ssPollJob(job_id, uploadBtn, progress);
+    } catch (err) {
+      console.error("[Shutterstock] Upload failed:", err);
+      progress.textContent = `Failed: ${err.message}`;
+      progress.classList.add("ss-progress-error");
+      uploadBtn.disabled = false;
     }
   }
 
@@ -2406,7 +2441,10 @@ Office.onReady(async ({ host }) => {
           <input type="checkbox" data-idx="${idx}" ${ok ? "checked" : "disabled"} />
         </label>
         <div class="ss-review-preview">${cand.svg}</div>
-        <input type="text" class="confirm-input ss-review-name" data-idx="${idx}" value="${cand.name.replace(/"/g, "&quot;")}" ${ok ? "" : "disabled"} />
+        <div class="ss-review-fields">
+          <input type="text" class="confirm-input ss-review-name" data-idx="${idx}" value="${cand.name.replace(/"/g, "&quot;")}" ${ok ? "" : "disabled"} />
+          <input type="text" class="confirm-input ss-review-tags" data-idx="${idx}" placeholder="tags, comma, separated" value="${(cand.tags || []).join(", ").replace(/"/g, "&quot;")}" ${ok ? "" : "disabled"} />
+        </div>
         <span class="ss-review-badge ss-badge-${cand.stroke_status}">${
           cand.stroke_status === "valid" ? "Stroke ✓" :
           cand.stroke_status === "outlined" ? "Outlined ✕" : "Mixed ?"
@@ -2439,11 +2477,16 @@ Office.onReady(async ({ host }) => {
         const nameInput = ssReviewGrid.querySelector(`.ss-review-name[data-idx="${idx}"]`);
         const name = (nameInput?.value || cand.name).trim();
         const iconId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        const tagsInput = ssReviewGrid.querySelector(`.ss-review-tags[data-idx="${idx}"]`);
+        const tags = (tagsInput?.value || "")
+          .split(",")
+          .map(t => t.trim().toLowerCase())
+          .filter(Boolean);
 
         const res = await fetch(`${ICON_API_BASE}/icons`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ id: iconId, name, svg: cand.svg, category: "Shutterstock", client_id: clientId })
+          body: JSON.stringify({ id: iconId, name, svg: cand.svg, category: "Shutterstock", client_id: clientId, tags })
         });
 
         if (res.ok) {
@@ -2462,6 +2505,7 @@ Office.onReady(async ({ host }) => {
 
       await loadIcons(token);
       ssReviewModal.classList.add("hidden");
+      ssResetUploadButton();
       showToast(`${added} icon${added !== 1 ? "s" : ""} added${failed ? `, ${failed} failed` : ""}`);
     } catch (err) {
       console.error("[Shutterstock] Approve failed:", err);
@@ -2472,14 +2516,40 @@ Office.onReady(async ({ host }) => {
     }
   }
 
+  function ssResetUploadButton() {
+    const uploadBtn = document.getElementById("ss-upload-btn");
+    const progress = document.getElementById("ss-upload-progress");
+    if (uploadBtn) {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = "Upload EPS sheet…";
+    }
+    if (progress) progress.classList.add("hidden");
+  }
+
   if (ssBtn) {
     ssBtn.addEventListener("click", () => toggleShutterstockPanel());
     ssSearchBtn.addEventListener("click", () => ssSearch(1));
     ssSearchIn.addEventListener("keydown", (e) => { if (e.key === "Enter") ssSearch(1); });
     ssPrev.addEventListener("click", () => ssSearch(ssPage - 1));
     ssNext.addEventListener("click", () => ssSearch(ssPage + 1));
-    ssReviewCancel.addEventListener("click", () => ssReviewModal.classList.add("hidden"));
+    ssReviewCancel.addEventListener("click", () => { ssReviewModal.classList.add("hidden"); ssResetUploadButton(); });
     ssReviewApprove.addEventListener("click", ssApproveSelected);
+
+    const ssUploadBtn = document.getElementById("ss-upload-btn");
+    const ssUploadInput = document.getElementById("ss-upload-input");
+    if (ssUploadBtn && ssUploadInput) {
+      ssUploadBtn.addEventListener("click", () => ssUploadInput.click());
+      ssUploadInput.addEventListener("change", () => {
+        const file = ssUploadInput.files[0];
+        ssUploadInput.value = ""; // allow re-selecting the same file
+        if (!file) return;
+        if (file.size > 30 * 1024 * 1024) {
+          showToast("File too large (max 30 MB)");
+          return;
+        }
+        ssUploadFile(file);
+      });
+    }
   }
 
   await bootstrap();

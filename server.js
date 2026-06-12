@@ -346,7 +346,7 @@ app.get("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireR
 
     // Fetch icons for this tenant OR public icons, include tenant and client names
     const result = await pool.query(
-      `SELECT i.icon_id as id, i.name, i.category, i.svg, i.is_public,
+      `SELECT i.icon_id as id, i.name, i.category, i.svg, i.tags, i.is_public,
               t.name as tenant_name,
               c.id as client_id,
               c.name as client_name
@@ -446,11 +446,17 @@ function checkStrokeWeight(svg) {
 
 // POST /api/icons — add a new icon (admin only)
 app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
-  const { id, name, category, svg, client_id } = req.body;
+  const { id, name, category, svg, client_id, tags } = req.body;
 
   if (!id || !name || !svg) {
     return res.status(400).json({ error: "Missing required fields: id, name, svg" });
   }
+
+  // Sanitize tags: lowercase single words, capped in count and length
+  const cleanTags = (Array.isArray(tags) ? tags : [])
+    .map(t => String(t).toLowerCase().trim().replace(/[^a-z0-9-]+/g, "").slice(0, 30))
+    .filter(Boolean)
+    .slice(0, 12);
 
   // VALIDATE SVG CONTENT
   // 1. Check viewBox is exactly "0 0 24 24"
@@ -492,17 +498,18 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
     }
 
     const result = await pool.query(
-      `INSERT INTO icons (tenant_id, icon_id, name, category, svg, client_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO icons (tenant_id, icon_id, name, category, svg, client_id, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (tenant_id, icon_id)
        DO UPDATE SET
          name = EXCLUDED.name,
          category = EXCLUDED.category,
          svg = EXCLUDED.svg,
          client_id = EXCLUDED.client_id,
+         tags = EXCLUDED.tags,
          updated_at = CURRENT_TIMESTAMP
        RETURNING (xmax = 0) AS inserted`,
-      [tenantId, id, name, category || 'Uncategorized', svg, client_id || null]
+      [tenantId, id, name, category || 'Uncategorized', svg, client_id || null, JSON.stringify(cleanTags)]
     );
 
     const wasInserted = result.rows[0].inserted;
@@ -676,6 +683,46 @@ app.post("/api/shutterstock/ingest", requireAuth, ensureTenantExists, extractUse
     res.status(500).json({ error: "Failed to start ingestion", detail: error.message });
   }
 });
+
+// POST /api/shutterstock/upload — ingest a manually-uploaded EPS sheet.
+// Works around API catalog restrictions: admin downloads the sheet from
+// shutterstock.com under the normal subscription, then uploads it here.
+// Body is the raw EPS bytes; filename goes in the X-Filename header.
+app.post(
+  "/api/shutterstock/upload",
+  requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'),
+  express.raw({ type: () => true, limit: "30mb" }),
+  async (req, res) => {
+    const epsBuffer = req.body;
+    if (!Buffer.isBuffer(epsBuffer) || epsBuffer.length === 0) {
+      return res.status(400).json({ error: "Empty upload body" });
+    }
+
+    // EPS magic: "%!PS" (plain), "%PDF" (PDF-compatible), or C5 D0 D3 C6 (DOS EPS binary)
+    const head = epsBuffer.subarray(0, 4);
+    const isEps = head.toString("latin1").startsWith("%!PS")
+      || head.toString("latin1").startsWith("%PDF")
+      || (head[0] === 0xc5 && head[1] === 0xd0 && head[2] === 0xd3 && head[3] === 0xc6);
+    if (!isEps) {
+      return res.status(400).json({ error: "File does not look like an EPS — upload the .eps from Shutterstock" });
+    }
+
+    try {
+      const filename = decodeURIComponent(req.get("X-Filename") || "upload.eps").slice(0, 200);
+      const job = await ingestJobs.createUploadJob({
+        tenantId: req.user.tenantId,
+        epsBuffer,
+        filename,
+        createdBy: req.user.email || req.user.preferred_username,
+      });
+      console.log(`[Shutterstock] Upload job ${job.id} created for "${filename}" (${(epsBuffer.length / 1024).toFixed(0)} KB)`);
+      res.status(202).json({ job_id: job.id, status: job.status });
+    } catch (error) {
+      console.error('[Shutterstock] Upload error:', error.message);
+      res.status(500).json({ error: "Failed to start upload ingestion", detail: error.message });
+    }
+  }
+);
 
 // GET /api/shutterstock/jobs/:id — poll job status (tenant-scoped)
 app.get("/api/shutterstock/jobs/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
