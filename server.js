@@ -699,38 +699,38 @@ app.post("/api/shutterstock/ingest", requireAuth, ensureTenantExists, extractUse
   }
 });
 
-// POST /api/shutterstock/upload — ingest a manually-uploaded EPS sheet.
-// Works around API catalog restrictions: admin downloads the sheet from
-// shutterstock.com under the normal subscription, then uploads it here.
-// Body is the raw EPS bytes; filename goes in the X-Filename header.
+// POST /api/shutterstock/upload — ingest a manually-uploaded sheet.
+// Accepts an EPS (heuristic segmentation) OR — preferred for accurate, complete
+// icons — an original grouped SVG (Illustrator "Save As SVG"), which segments
+// by its real icon groups. Body is the raw file bytes; filename in X-Filename.
 app.post(
   "/api/shutterstock/upload",
   requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'),
   express.raw({ type: () => true, limit: "30mb" }),
   async (req, res) => {
-    const epsBuffer = req.body;
-    if (!Buffer.isBuffer(epsBuffer) || epsBuffer.length === 0) {
+    const buffer = req.body;
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
       return res.status(400).json({ error: "Empty upload body" });
     }
 
-    // EPS magic: "%!PS" (plain), "%PDF" (PDF-compatible), or C5 D0 D3 C6 (DOS EPS binary)
-    const head = epsBuffer.subarray(0, 4);
-    const isEps = head.toString("latin1").startsWith("%!PS")
-      || head.toString("latin1").startsWith("%PDF")
+    const headStr = buffer.subarray(0, 512).toString("latin1");
+    const head = buffer.subarray(0, 4);
+    const isEps = headStr.startsWith("%!PS") || headStr.startsWith("%PDF")
       || (head[0] === 0xc5 && head[1] === 0xd0 && head[2] === 0xd3 && head[3] === 0xc6);
-    if (!isEps) {
-      return res.status(400).json({ error: "File does not look like an EPS — upload the .eps from Shutterstock" });
+    const isSvg = /<svg[\s>]/i.test(headStr) || (/^\s*<\?xml/i.test(headStr) && buffer.toString("latin1").includes("<svg"));
+    if (!isEps && !isSvg) {
+      return res.status(400).json({ error: "File must be an EPS or SVG — upload the .eps or (better) the original .svg" });
     }
 
     try {
-      const filename = decodeURIComponent(req.get("X-Filename") || "upload.eps").slice(0, 200);
+      const filename = decodeURIComponent(req.get("X-Filename") || (isSvg ? "upload.svg" : "upload.eps")).slice(0, 200);
       const job = await ingestJobs.createUploadJob({
         tenantId: req.user.tenantId,
-        epsBuffer,
+        buffer,
         filename,
         createdBy: req.user.email || req.user.preferred_username,
       });
-      console.log(`[Shutterstock] Upload job ${job.id} created for "${filename}" (${(epsBuffer.length / 1024).toFixed(0)} KB)`);
+      console.log(`[Shutterstock] Upload job ${job.id} created for "${filename}" (${isSvg ? "SVG" : "EPS"}, ${(buffer.length / 1024).toFixed(0)} KB)`);
       res.status(202).json({ job_id: job.id, status: job.status });
     } catch (error) {
       console.error('[Shutterstock] Upload error:', error.message);
