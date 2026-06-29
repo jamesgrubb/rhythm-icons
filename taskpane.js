@@ -1061,31 +1061,38 @@ Office.onReady(async ({ host }) => {
       let modifiedContent = svgContent;
       const strokeClass = `${themeClass}_Stroke_v2`;
 
-      // Extract stroke-width and other properties from existing styles
+      // Extract the icon's OWN stroke weight + caps. Curated icons carry it in
+      // a <style> block (stroke-width:2px); ingested icons carry it as a
+      // per-element stroke-width attribute (preserved thin, e.g. 0.4). Respect
+      // whichever is present so dense ingested icons stay crisp instead of
+      // being forced to a heavy 2pt.
       const styleMatch = modifiedContent.match(/<style[\s\S]*?<\/style>/);
-      let strokeWidth = '2'; // default - 2pt stroke
+      let strokeWidth = null;
       let strokeLinecap = 'round';
       let strokeLinejoin = 'round';
 
       if (styleMatch) {
         const styleContent = styleMatch[0];
-        const swMatch = styleContent.match(/stroke-width:\s*([\d.]+)px/);
+        const swMatch = styleContent.match(/stroke-width:\s*([\d.]+)px?/);
         if (swMatch) strokeWidth = swMatch[1];
-
         const lcMatch = styleContent.match(/stroke-linecap:\s*(\w+)/);
         if (lcMatch) strokeLinecap = lcMatch[1];
-
         const ljMatch = styleContent.match(/stroke-linejoin:\s*(\w+)/);
         if (ljMatch) strokeLinejoin = ljMatch[1];
       }
+      if (strokeWidth === null) {
+        // ingested icons: read the (preserved) per-element stroke-width
+        const attrMatch = svg.match(/stroke-width=["']([\d.]+)["']/);
+        if (attrMatch) strokeWidth = attrMatch[1];
+      }
+      if (strokeWidth === null) strokeWidth = '2';
 
       console.log(`[PPT] Extracted properties: stroke-width=${strokeWidth}, linecap=${strokeLinecap}, linejoin=${strokeLinejoin}`);
 
-      // Scale stroke-width to maintain constant 2pt appearance across all icon sizes
-      // Formula: Keep stroke constant in pixels regardless of icon size
-      // For 48px icon with viewBox 24x24: 1 viewBox unit = 2px, so we want stroke = 1.0 to get 2pt
-      const scaleFactor = selectedSize / 24; // How many pixels per viewBox unit
-      const targetStrokePt = 2; // Target stroke in points
+      // Keep the stroke a constant on-screen size across icon sizes, but at the
+      // icon's OWN designed weight (viewBox units) rather than a fixed 2.
+      const scaleFactor = selectedSize / 24; // pixels per viewBox unit
+      const targetStrokePt = parseFloat(strokeWidth) || 2; // the icon's weight, in viewBox units
       const adjustedStrokeWidth = targetStrokePt / scaleFactor;
 
       console.log(`[PPT] Icon size: ${selectedSize}px, Scale: ${scaleFactor}x, Adjusted stroke: ${adjustedStrokeWidth.toFixed(3)} (renders as ${targetStrokePt}pt)`);

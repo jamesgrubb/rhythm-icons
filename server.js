@@ -426,12 +426,11 @@ app.get("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
 });
 
 // ---- Stroke weight validation ----
-// Library convention is an effective stroke-width of 2 (viewBox units) so all
-// icons render with a consistent line weight in documents. Effective width =
-// declared stroke-width × any scale() transform applied above the element.
-const STROKE_WEIGHT_TARGET = 2;
-const STROKE_WEIGHT_TOLERANCE = 0.5;
-
+// Icons must be stroke-based (so they recolour with the PowerPoint theme), but
+// the weight is intentionally NOT forced to a fixed value: ingested icons
+// preserve their source line weight (often thin for dense icons), and the
+// insert path renders each at its own weight. So we only require that a
+// positive stroke-width is declared and isn't absurdly large.
 function checkStrokeWeight(svg) {
   const widths = [];
   for (const m of svg.matchAll(/stroke-width=["']([^"']+)["']/g)) {
@@ -443,30 +442,18 @@ function checkStrokeWeight(svg) {
     if (!isNaN(w)) widths.push(w);
   }
 
-  if (widths.length === 0) {
+  if (widths.length === 0 || !widths.some(w => w > 0)) {
     return {
       ok: false,
-      error: `SVG has no stroke-width - icons must declare stroke-width so they render at weight ${STROKE_WEIGHT_TARGET} (e.g. stroke-width="2")`
+      error: 'SVG has no positive stroke-width - icons must be stroke-based (e.g. stroke-width="2") so they recolour with the document theme'
     };
   }
 
-  // Single uniform scale() transform (the shape our ingestion pipeline emits).
-  // Multiple differing scales can't be checked reliably with regex - allow them
-  // through only if the raw widths already pass.
-  const scaleMatches = [...svg.matchAll(/scale\(\s*(-?\d*\.?\d+)/g)].map(m => Math.abs(parseFloat(m[1])));
-  const scale = scaleMatches.length === 1 ? scaleMatches[0] : 1;
-
-  const min = STROKE_WEIGHT_TARGET - STROKE_WEIGHT_TOLERANCE;
-  const max = STROKE_WEIGHT_TARGET + STROKE_WEIGHT_TOLERANCE;
-  const offWeights = widths
-    .map(w => +(w * scale).toFixed(2))
-    .filter(eff => eff < min || eff > max);
-
-  if (offWeights.length > 0) {
-    return {
-      ok: false,
-      error: `Stroke weight out of range: effective width ${offWeights.join(", ")} - must be ${min}-${max} so icons render in line with the library (target ${STROKE_WEIGHT_TARGET})`
-    };
+  // Sanity bound only: a stroke-width far larger than the 24-unit viewBox means
+  // the icon is malformed (e.g. an un-scaled raw coordinate slipped through).
+  const tooThick = widths.filter(w => w > 24);
+  if (tooThick.length > 0) {
+    return { ok: false, error: `Stroke weight implausibly large (${tooThick.join(", ")}) for a 24-unit icon` };
   }
 
   return { ok: true };
