@@ -1153,8 +1153,15 @@ Office.onReady(async ({ host }) => {
         const padding = 6;
         viewBox = `${-padding} ${-padding} ${vbParts[2] + padding * 2} ${vbParts[3] + padding * 2}`;
 
-        backgroundCircle = `<circle cx="${cx}" cy="${cy}" r="${radius}" class="MsftOfcThm_Background2_Fill_v2" />
+        if (mixedStroke) {
+          // Mixed stroke: tint the circle with a light version of the first
+          // stroke colour (over white) instead of defaulting to flat grey.
+          backgroundCircle = `<circle cx="${cx}" cy="${cy}" r="${radius}" class="MsftOfcThm_Background1_Fill_v2" />
+           <circle cx="${cx}" cy="${cy}" r="${radius}" class="MsftOfcThm_${mixedColor1}_Fill_v2" opacity="0.18" />`;
+        } else {
+          backgroundCircle = `<circle cx="${cx}" cy="${cy}" r="${radius}" class="MsftOfcThm_Background2_Fill_v2" />
            <circle cx="${cx}" cy="${cy}" r="${radius}" class="${themeClass}_Fill_v2" opacity="0.35" />`;
+        }
       }
 
       // Consistent stroke weight: a fixed 2pt for EVERY icon, derived from the
@@ -1204,6 +1211,7 @@ Office.onReady(async ({ host }) => {
           }
           .MsftOfcThm_${mixedColor1}_Fill_v2 { fill: ${color1Value}; }
           .MsftOfcThm_${mixedColor2}_Fill_v2 { fill: ${color2Value}; }
+          .MsftOfcThm_Background1_Fill_v2 { fill: ${themeColors ? themeColors.Background1 : "#FFFFFF"}; }
           .MsftOfcThm_Background2_Fill_v2 { fill: ${themeColors ? themeColors.Background2 : "#F5F5F5"}; }`;
       } else {
         // Single color mode
