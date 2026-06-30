@@ -1273,7 +1273,7 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 
 /* ---- ROLE BADGES & USER INFO ---- */
 .role-badge {
-  padding: 4px 11px;
+  padding: 3px 11px 5px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
