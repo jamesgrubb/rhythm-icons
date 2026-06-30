@@ -504,8 +504,6 @@ Office.onReady(async ({ host }) => {
       visible = filterIcons(allIcons, { client: activeClient, query: activeQuery });
     }
     resultCount.textContent = `${visible.length} icon${visible.length !== 1 ? "s" : ""}`;
-    const headerCount = document.getElementById("header-count");
-    if (headerCount) headerCount.textContent = `${allIcons.length} icon${allIcons.length !== 1 ? "s" : ""}`;
 
     if (visible.length === 0) {
       iconGrid.innerHTML = "";
@@ -1547,6 +1545,8 @@ Office.onReady(async ({ host }) => {
 
   // ---- Sign-out ----
   signoutBtn.addEventListener("click", async () => {
+    const confirmed = await customConfirm("Sign out of the icon library?", "Sign out");
+    if (!confirmed) return;
     try {
       await signOut();
       stopThemeRefresh(); // Stop monitoring theme changes

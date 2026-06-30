@@ -194,46 +194,36 @@ header {
 }
 .header-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-.header-left {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-width: 0;
 }
 .header-title {
   font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: var(--text);
-}
-.header-count {
-  font-size: 12px;
-  color: var(--text-2);
-}
-.header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
   flex-shrink: 0;
 }
+/* Account cluster doubles as the sign-out control */
 .account-cluster {
   display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: 100%;
+  gap: 8px;
   min-width: 0;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
 }
+.account-cluster:hover { background: var(--bg-2); }
 .user-info-container {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
+  gap: 8px;
+  font-size: 13px;
   color: var(--text-2);
   overflow: hidden;
   min-width: 0;
@@ -242,25 +232,34 @@ header {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 110px;
+  max-width: 130px;
 }
-.btn-user { flex-shrink: 0; }
+
+/* Search row: full-width search + Add Icon button */
+.search-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.search-row .search-wrap { flex: 1; min-width: 0; }
 
 /* Primary "Add Icon" button */
 .btn-add-icon {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 0 16px;
   background: #2563eb;
   color: #fff;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   font-family: var(--font);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   flex-shrink: 0;
+  white-space: nowrap;
   transition: background 0.15s, transform 0.12s var(--ease);
 }
 .btn-add-icon:hover { background: #1d4ed8; }
@@ -1274,18 +1273,18 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 
 /* ---- ROLE BADGES & USER INFO ---- */
 .role-badge {
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 600;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   flex-shrink: 0;
   line-height: 1.2;
 }
 
 .role-admin {
-  background: #4472C4;
+  background: #2563eb;
   color: white;
 }
 

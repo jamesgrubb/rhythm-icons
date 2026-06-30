@@ -47,38 +47,29 @@
     <div id="main-screen" class="screen">
       <header>
         <div class="header-top">
-          <div class="header-left">
-            <span class="header-title">Icon Library</span>
-            <span id="header-count" class="header-count"></span>
-          </div>
-          <div class="header-right">
-            <div class="account-cluster">
-              <div id="user-info-container" class="user-info-container"></div>
-              <button id="signout-btn" class="btn-ghost btn-user" title="Sign out">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="1.5"/>
-                  <path d="M5.5 20a6.5 6.5 0 0 1 13 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-              </button>
-            </div>
-            <button id="upload-btn" class="btn-add-icon" title="Add icons" style="display: none;">
+          <span class="header-title">Icon Library</span>
+          <button id="signout-btn" class="account-cluster" title="Sign out">
+            <div id="user-info-container" class="user-info-container"></div>
+          </button>
+        </div>
+        <div class="search-row">
+          <div class="search-wrap">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input id="search-input" type="text" placeholder="Search icons…" autocomplete="off" />
+            <button id="clear-search" class="btn-clear hidden">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
-              <span>Add Icon</span>
             </button>
           </div>
-        </div>
-        <div class="search-wrap">
-          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          <input id="search-input" type="text" placeholder="Search… (Enter = AI search)" autocomplete="off" />
-          <button id="clear-search" class="btn-clear hidden">
+          <button id="upload-btn" class="btn-add-icon" title="Add icons" style="display: none;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
+            <span>Add Icon</span>
           </button>
         </div>
         <!-- Active AI search indicator -->
