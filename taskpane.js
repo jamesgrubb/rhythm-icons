@@ -649,11 +649,15 @@ Office.onReady(async ({ host }) => {
     // Show modal
     modal.classList.remove("hidden");
 
-    // Handle cancel
-    const onCancel = () => {
+    // Close the modal + clean up (Cancel button, backdrop click, Escape key)
+    const onBackdrop = (e) => { if (e.target === modal) closeModal(); };
+    const onKey = (e) => { if (e.key === "Escape") closeModal(); };
+    const closeModal = () => {
       modal.classList.add("hidden");
-      cancelBtn.removeEventListener("click", onCancel);
+      cancelBtn.removeEventListener("click", closeModal);
       saveBtn.removeEventListener("click", onSave);
+      modal.removeEventListener("click", onBackdrop);
+      document.removeEventListener("keydown", onKey);
     };
 
     // Handle save
@@ -701,17 +705,17 @@ Office.onReady(async ({ host }) => {
         renderGrid();
 
         showToast(`"${newName}" updated`);
-        modal.classList.add("hidden");
-        cancelBtn.removeEventListener("click", onCancel);
-        saveBtn.removeEventListener("click", onSave);
+        closeModal();
       } catch (error) {
         console.error('[Edit] Error:', error);
         showToast(`Error: ${error.message}`);
       }
     };
 
-    cancelBtn.addEventListener("click", onCancel);
+    cancelBtn.addEventListener("click", closeModal);
     saveBtn.addEventListener("click", onSave);
+    modal.addEventListener("click", onBackdrop);
+    document.addEventListener("keydown", onKey);
   }
 
   // ---- Insert icon into document ----
