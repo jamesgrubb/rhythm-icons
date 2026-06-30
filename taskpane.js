@@ -627,7 +627,7 @@ Office.onReady(async ({ host }) => {
 
       // Re-render UI
       invalidateCountCache();
-      const clients = getClients(allIcons);
+      const clients = getClients(allIcons, allClients.map(c => c.name));
       renderClientTabs(clients);
       renderGrid();
 
@@ -725,7 +725,7 @@ Office.onReady(async ({ host }) => {
 
         // Re-render UI
         invalidateCountCache();
-        const clients = getClients(allIcons);
+        const clients = getClients(allIcons, allClients.map(c => c.name));
         renderClientTabs(clients);
         renderGrid();
 
@@ -823,7 +823,7 @@ Office.onReady(async ({ host }) => {
 
       exitSelectionMode();
       invalidateCountCache();
-      renderClientTabs(getClients(allIcons));
+      renderClientTabs(getClients(allIcons, allClients.map(c => c.name)));
       renderGrid();
       showToast(`${data.deleted} icon${data.deleted !== 1 ? "s" : ""} deleted`);
     } catch (error) {
@@ -1514,7 +1514,7 @@ Office.onReady(async ({ host }) => {
     aiSearchIds = null;
     aiChip.classList.add("hidden");
     if (rerender) {
-      renderClientTabs(getClients(allIcons));
+      renderClientTabs(getClients(allIcons, allClients.map(c => c.name)));
       renderGrid();
     }
   }
@@ -1536,7 +1536,7 @@ Office.onReady(async ({ host }) => {
       const { ids } = await res.json();
       aiSearchIds = ids || [];
       aiChipLabel.textContent = `✨ "${query}" — ${aiSearchIds.length} match${aiSearchIds.length !== 1 ? "es" : ""}`;
-      renderClientTabs(getClients(allIcons));
+      renderClientTabs(getClients(allIcons, allClients.map(c => c.name)));
       renderGrid();
     } catch (err) {
       console.error("[AI Search] Failed:", err);
@@ -1551,7 +1551,7 @@ Office.onReady(async ({ host }) => {
     clearAiSearch({ rerender: false }); // typing returns to instant local filtering
 
     // Refresh client tabs to update counts based on search
-    const clients = getClients(allIcons);
+    const clients = getClients(allIcons, allClients.map(c => c.name));
     renderClientTabs(clients);
 
     renderGrid();
@@ -1573,7 +1573,7 @@ Office.onReady(async ({ host }) => {
     clearAiSearch({ rerender: false });
 
     // Refresh client tabs to show full counts
-    const clients = getClients(allIcons);
+    const clients = getClients(allIcons, allClients.map(c => c.name));
     renderClientTabs(clients);
 
     renderGrid();
@@ -1772,10 +1772,11 @@ Office.onReady(async ({ host }) => {
       }
     }
 
-    // Fetch icons
+    // Fetch icons + the full group list (so empty groups still get a tab)
     allIcons = await fetchIconsFromAPI(accessToken);
+    await fetchClients();
     invalidateCountCache();
-    const clients = getClients(allIcons);
+    const clients = getClients(allIcons, allClients.map(c => c.name));
 
     renderClientTabs(clients);
     renderGrid();

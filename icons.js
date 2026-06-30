@@ -703,10 +703,12 @@ function iconClientNames(icon) {
 }
 
 /**
- * Get unique client (group) names from an icon list.
+ * Get unique client (group) names for the group tabs.
+ * `allGroupNames` seeds the list with every group for the tenant, so groups
+ * with no icons assigned still appear as tabs (showing a count of 0).
  */
-function getClients(icons) {
-  const names = new Set();
+function getClients(icons, allGroupNames = []) {
+  const names = new Set(allGroupNames);
   let hasUnassigned = false;
   icons.forEach(i => {
     const cs = iconClientNames(i);
