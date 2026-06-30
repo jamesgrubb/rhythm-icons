@@ -1493,6 +1493,35 @@ Office.onReady(async ({ host }) => {
     console.log("[MixedStroke] Mixed stroke mode:", mixedStroke);
   });
 
+  // ---- Quick-return header ----
+  // The editing controls stay pinned (CSS sticky). The title + name + search +
+  // group tabs hide when scrolling down and slide back in when scrolling up.
+  (function setupQuickReturnHeader() {
+    const scroller = document.querySelector("#main-screen main");
+    const chrome = document.querySelector("#main-screen header");
+    if (!scroller || !chrome) return;
+
+    let lastScroll = 0;
+    let ticking = false;
+
+    function apply() {
+      const st = scroller.scrollTop;
+      if (st <= 0) {
+        chrome.style.marginTop = "";                 // fully shown at the very top
+      } else if (st > lastScroll + 3 && st > 40) {
+        chrome.style.marginTop = `-${chrome.offsetHeight}px`;  // scrolling down → hide
+      } else if (st < lastScroll - 3) {
+        chrome.style.marginTop = "";                 // scrolling up → reveal
+      }
+      lastScroll = st;
+      ticking = false;
+    }
+
+    scroller.addEventListener("scroll", () => {
+      if (!ticking) { requestAnimationFrame(apply); ticking = true; }
+    }, { passive: true });
+  })();
+
   // ---- Mixed stroke color selectors ----
   mixedColorBtns.forEach(btn => {
     btn.addEventListener("click", () => {
