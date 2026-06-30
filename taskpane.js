@@ -504,6 +504,8 @@ Office.onReady(async ({ host }) => {
       visible = filterIcons(allIcons, { client: activeClient, query: activeQuery });
     }
     resultCount.textContent = `${visible.length} icon${visible.length !== 1 ? "s" : ""}`;
+    const headerCount = document.getElementById("header-count");
+    if (headerCount) headerCount.textContent = `${allIcons.length} icon${allIcons.length !== 1 ? "s" : ""}`;
 
     if (visible.length === 0) {
       iconGrid.innerHTML = "";
@@ -1563,8 +1565,7 @@ Office.onReady(async ({ host }) => {
     const uploadBtn = document.getElementById('upload-btn');
     const adminPanelBtn = document.getElementById('admin-panel-btn');
 
-    // Show/hide buttons based on role
-    const shutterstockBtn = document.getElementById('shutterstock-btn');
+    // Show/hide admin-only buttons based on role
     if (currentUserRole === 'admin') {
       if (uploadBtn) uploadBtn.style.display = 'flex';
       if (adminPanelBtn) adminPanelBtn.style.display = 'flex';
@@ -1572,15 +1573,13 @@ Office.onReady(async ({ host }) => {
       if (uploadBtn) uploadBtn.style.display = 'none';
       if (adminPanelBtn) adminPanelBtn.style.display = 'none';
     }
-    // Shutterstock search is open to all signed-in roles;
-    // licensing/ingest inside the panel stays admin-only
-    if (shutterstockBtn) shutterstockBtn.style.display = currentUserRole ? 'flex' : 'none';
 
-    // Update header with user info
+    // Update header with user name + role badge
     const userInfoContainer = document.getElementById('user-info-container');
     if (userInfoContainer && currentUserProfile) {
+      userInfoContainer.title = currentUserProfile.tenant.name;
       userInfoContainer.innerHTML = `
-        <span class="user-tenant">${currentUserProfile.tenant.name}</span>
+        <span class="user-name">${currentUserProfile.name || currentUserProfile.email || ''}</span>
         <span class="role-badge role-${currentUserRole}">${currentUserRole.toUpperCase()}</span>
       `;
     }
