@@ -625,7 +625,7 @@ Office.onReady(async ({ host }) => {
     const modal = document.getElementById("edit-icon-modal");
     const svgPreview = document.getElementById("edit-icon-svg");
     const nameInput = document.getElementById("edit-icon-name");
-    const clientSelect = document.getElementById("edit-icon-client");
+    const clientsContainer = document.getElementById("edit-icon-clients");
     const cancelBtn = document.getElementById("edit-icon-cancel");
     const saveBtn = document.getElementById("edit-icon-save");
 
@@ -640,20 +640,9 @@ Office.onReady(async ({ host }) => {
     svgPreview.innerHTML = previewSvg;
     nameInput.value = icon.name;
 
-    console.log('[Edit] Icon client_id:', icon.client_id, 'Available clients:', allClients.length);
-
-    // Populate client dropdown
-    clientSelect.innerHTML = '<option value="">No client</option>';
-    allClients.forEach(client => {
-      const option = document.createElement('option');
-      option.value = client.id;
-      option.textContent = client.name;
-      if (icon.client_id === client.id) {
-        option.selected = true;
-        console.log('[Edit] Selected client:', client.name);
-      }
-      clientSelect.appendChild(option);
-    });
+    // Render group toggle-chips, pre-selecting the icon's current groups
+    const currentGroupIds = (icon.clients || []).map(c => c.id);
+    renderGroupChips(clientsContainer, currentGroupIds);
 
     // Show modal
     modal.classList.remove("hidden");
@@ -668,7 +657,7 @@ Office.onReady(async ({ host }) => {
     // Handle save
     const onSave = async () => {
       const newName = nameInput.value.trim();
-      const newClientId = clientSelect.value || null;
+      const newClientIds = getSelectedGroupIds(clientsContainer);
 
       if (!newName) {
         showToast('Icon name cannot be empty');
@@ -681,7 +670,7 @@ Office.onReady(async ({ host }) => {
           id: icon.id,
           name: newName,
           svg: icon.svg, // Keep existing SVG
-          client_id: newClientId
+          client_ids: newClientIds
         };
 
         const res = await fetch(`${ICON_API_BASE}/icons/${icon.id}`, {
@@ -698,17 +687,10 @@ Office.onReady(async ({ host }) => {
           throw new Error(error.error || 'Failed to update icon');
         }
 
-        // Update local icon object
+        // Update local icon object to reflect the new group assignments
         icon.name = newName;
-        icon.client_id = newClientId;
-
-        // Update client_name based on selected client
-        if (newClientId) {
-          const selectedClient = allClients.find(c => c.id === newClientId);
-          icon.client_name = selectedClient ? selectedClient.name : null;
-        } else {
-          icon.client_name = null;
-        }
+        icon.clients = allClients.filter(c => newClientIds.includes(String(c.id)))
+          .map(c => ({ id: c.id, name: c.name }));
 
         // Re-render UI
         invalidateCountCache();
@@ -1767,6 +1749,36 @@ Office.onReady(async ({ host }) => {
     }
   }
 
+  // ---- Group toggle-chip selector (shared by edit + review modals) ----
+  // Renders one chip per group; tap to toggle. selectedIds pre-selects.
+  function renderGroupChips(container, selectedIds) {
+    if (!container) return;
+    const selected = new Set((selectedIds || []).map(String));
+    container.innerHTML = "";
+    if (!allClients.length) {
+      container.innerHTML = '<span class="group-chips-empty">No groups yet.</span>';
+      return;
+    }
+    allClients.forEach(client => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "group-chip" + (selected.has(String(client.id)) ? " selected" : "");
+      chip.dataset.clientId = client.id;
+      chip.textContent = client.name;
+      chip.setAttribute("aria-pressed", chip.classList.contains("selected") ? "true" : "false");
+      chip.addEventListener("click", () => {
+        const on = chip.classList.toggle("selected");
+        chip.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      container.appendChild(chip);
+    });
+  }
+
+  function getSelectedGroupIds(container) {
+    if (!container) return [];
+    return [...container.querySelectorAll(".group-chip.selected")].map(c => c.dataset.clientId);
+  }
+
   function populateClientSelect() {
     // Clear existing options except the first one
     iconClientSelect.innerHTML = '<option value="">Select client...</option>';
@@ -2269,7 +2281,7 @@ Office.onReady(async ({ host }) => {
   const ssPageLabel  = document.getElementById("ss-page-label");
   const ssReviewModal   = document.getElementById("ss-review-modal");
   const ssReviewGrid    = document.getElementById("ss-review-grid");
-  const ssReviewClient  = document.getElementById("ss-review-client");
+  const ssReviewClients = document.getElementById("ss-review-clients");
   const ssReviewCancel  = document.getElementById("ss-review-cancel");
   const ssReviewApprove = document.getElementById("ss-review-approve");
 
@@ -2495,15 +2507,9 @@ Office.onReady(async ({ host }) => {
     ssReviewJobId = jobId;
     ssCandidates = candidates;
 
-    // Populate client dropdown (same data the edit modal uses)
+    // Group toggle-chips (same control as the edit modal)
     await fetchClients();
-    ssReviewClient.innerHTML = '<option value="">No client</option>';
-    allClients.forEach(client => {
-      const opt = document.createElement("option");
-      opt.value = client.id;
-      opt.textContent = client.name;
-      ssReviewClient.appendChild(opt);
-    });
+    renderGroupChips(ssReviewClients, []);
 
     ssReviewGrid.innerHTML = "";
     candidates.forEach((cand, idx) => {
@@ -2539,7 +2545,7 @@ Office.onReady(async ({ host }) => {
 
     ssReviewApprove.disabled = true;
     ssReviewApprove.textContent = "Adding…";
-    const clientId = ssReviewClient.value || null;
+    const clientIds = getSelectedGroupIds(ssReviewClients);
     let added = 0, failed = 0;
 
     try {
@@ -2560,7 +2566,7 @@ Office.onReady(async ({ host }) => {
         const res = await fetch(`${ICON_API_BASE}/icons`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ id: iconId, name, svg: cand.svg, category: "Shutterstock", client_id: clientId, tags })
+          body: JSON.stringify({ id: iconId, name, svg: cand.svg, category: "Shutterstock", client_ids: clientIds, tags })
         });
 
         if (res.ok) {

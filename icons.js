@@ -695,26 +695,41 @@ function getCategories(icons) {
   return ["All", ...cats];
 }
 
+// An icon's assigned group names (handles the many-to-many `clients` array,
+// with a fallback to the legacy single client_name for safety).
+function iconClientNames(icon) {
+  if (Array.isArray(icon.clients)) return icon.clients.map(c => c && c.name).filter(Boolean);
+  return icon.client_name ? [icon.client_name] : [];
+}
+
 /**
- * Get unique clients from an icon list.
+ * Get unique client (group) names from an icon list.
  */
 function getClients(icons) {
-  const clients = [...new Set(icons.map(i => i.client_name).filter(Boolean))].sort();
-  const hasUnassigned = icons.some(i => !i.client_name);
-  const result = ["All", ...clients];
+  const names = new Set();
+  let hasUnassigned = false;
+  icons.forEach(i => {
+    const cs = iconClientNames(i);
+    if (cs.length === 0) hasUnassigned = true;
+    cs.forEach(n => names.add(n));
+  });
+  const result = ["All", ...[...names].sort()];
   if (hasUnassigned) result.push("Unassigned");
   return result;
 }
 
 /**
- * Filter icons by client and/or search query.
- * Search includes: icon name, category, ID, client name, and AI tags.
+ * Filter icons by client and/or search query. An icon matches a group tab if
+ * it's assigned to that group (it may belong to several).
  */
 function filterIcons(icons, { client = "All", query = "" } = {}) {
   const q = query.toLowerCase().trim();
   return icons.filter(icon => {
-    const inClient = client === "All" || (icon.client_name === client) || (!icon.client_name && client === "Unassigned");
-    const clientName = (icon.client_name || "").toLowerCase();
+    const names = iconClientNames(icon);
+    const inClient = client === "All"
+      || names.includes(client)
+      || (names.length === 0 && client === "Unassigned");
+    const clientText = names.join(" ").toLowerCase();
     // AI tags: match when every query word hits a tag, so natural phrases
     // like "time tracking" find clock/stopwatch icons
     const tags = (icon.tags || []).map(t => String(t).toLowerCase()).join(" ");
@@ -724,7 +739,7 @@ function filterIcons(icons, { client = "All", query = "" } = {}) {
                     icon.name.toLowerCase().includes(q) ||
                     icon.category.toLowerCase().includes(q) ||
                     icon.id.includes(q) ||
-                    clientName.includes(q) ||
+                    clientText.includes(q) ||
                     tagsMatch;
     return inClient && inQuery;
   });

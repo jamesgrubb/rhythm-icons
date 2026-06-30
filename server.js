@@ -344,23 +344,28 @@ app.get("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireR
       return res.status(403).json({ error: "No tenant found for user" });
     }
 
-    // Fetch icons for this tenant OR public icons, include tenant and client names
+    // Fetch icons for this tenant OR public icons, aggregating their assigned
+    // groups (clients) into a `clients` array (many-to-many via icon_clients).
     const result = await pool.query(
       `SELECT i.icon_id as id, i.name, i.category, i.svg, i.tags, i.is_public,
               t.name as tenant_name,
-              c.id as client_id,
-              c.name as client_name
+              COALESCE(
+                json_agg(json_build_object('id', c.id, 'name', c.name) ORDER BY c.name)
+                  FILTER (WHERE c.id IS NOT NULL),
+                '[]'
+              ) AS clients
        FROM icons i
        LEFT JOIN tenants t ON i.tenant_id = t.id
-       LEFT JOIN clients c ON i.client_id = c.id
+       LEFT JOIN icon_clients ic ON ic.icon_id = i.id
+       LEFT JOIN clients c ON c.id = ic.client_id
        WHERE i.tenant_id = $1 OR i.is_public = true
-       ORDER BY c.name NULLS LAST, i.category, i.name`,
+       GROUP BY i.id, t.name
+       ORDER BY i.category, i.name`,
       [tenantId]
     );
 
-    const withClients = result.rows.filter(r => r.client_name).length;
-    const uniqueClients = [...new Set(result.rows.map(r => r.client_name).filter(Boolean))];
-    console.log(`[API] Returning ${result.rows.length} icons, ${withClients} with clients. Unique clients: [${uniqueClients.join(', ')}]`);
+    const withClients = result.rows.filter(r => (r.clients || []).length > 0).length;
+    console.log(`[API] Returning ${result.rows.length} icons, ${withClients} assigned to one+ groups`);
 
     res.json(result.rows);
   } catch (error) {
@@ -461,11 +466,17 @@ function checkStrokeWeight(svg) {
 
 // POST /api/icons — add a new icon (admin only)
 app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
-  const { id, name, category, svg, client_id, tags } = req.body;
+  const { id, name, category, svg, client_id, client_ids, tags } = req.body;
 
   if (!id || !name || !svg) {
     return res.status(400).json({ error: "Missing required fields: id, name, svg" });
   }
+
+  // Group assignment: accept client_ids[] (multi) or legacy client_id (single)
+  const groupIds = [...new Set(
+    (Array.isArray(client_ids) ? client_ids : (client_id ? [client_id] : []))
+      .filter(Boolean).map(String)
+  )];
 
   // Sanitize tags: lowercase single words, capped in count and length
   const cleanTags = (Array.isArray(tags) ? tags : [])
@@ -523,9 +534,22 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
          client_id = EXCLUDED.client_id,
          tags = EXCLUDED.tags,
          updated_at = CURRENT_TIMESTAMP
-       RETURNING (xmax = 0) AS inserted`,
-      [tenantId, id, name, category || 'Uncategorized', svg, client_id || null, JSON.stringify(cleanTags)]
+       RETURNING id, (xmax = 0) AS inserted`,
+      [tenantId, id, name, category || 'Uncategorized', svg, groupIds[0] || null, JSON.stringify(cleanTags)]
     );
+
+    // Replace this icon's group assignments (validate the groups belong to tenant)
+    const iconUuid = result.rows[0].id;
+    await pool.query('DELETE FROM icon_clients WHERE icon_id = $1', [iconUuid]);
+    if (groupIds.length) {
+      await pool.query(
+        `INSERT INTO icon_clients (icon_id, client_id)
+         SELECT $1, c.id FROM clients c
+         WHERE c.tenant_id = $2 AND c.id = ANY($3::uuid[])
+         ON CONFLICT DO NOTHING`,
+        [iconUuid, tenantId, groupIds]
+      );
+    }
 
     const wasInserted = result.rows[0].inserted;
     const action = wasInserted ? 'created' : 'updated';
@@ -767,8 +791,14 @@ app.post("/api/shutterstock/jobs/:id/complete", requireAuth, ensureTenantExists,
 // PUT /api/icons/:id — update an existing icon (admin only)
 app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
   const { id } = req.params;
-  const { name, category, svg, is_public, client_id } = req.body;
+  const { name, category, svg, is_public, client_id, client_ids } = req.body;
   const tenantId = req.user.tenantId;
+
+  // Group assignment: accept client_ids[] (multi) or legacy client_id (single)
+  const groupIds = [...new Set(
+    (Array.isArray(client_ids) ? client_ids : (client_id ? [client_id] : []))
+      .filter(Boolean).map(String)
+  )];
 
   try {
     // Verify icon belongs to user's tenant (prevent cross-tenant updates)
@@ -780,9 +810,8 @@ app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Icon not found or access denied' });
     }
+    const iconUuid = existing.rows[0].id;
 
-    // Update icon (only provided fields)
-    // Note: We use COALESCE for optional fields, but explicitly set client_id even if null
     await pool.query(
       `UPDATE icons
        SET name = COALESCE($1, name),
@@ -792,10 +821,22 @@ app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
            client_id = $5,
            updated_at = NOW()
        WHERE icon_id = $6 AND tenant_id = $7`,
-      [name, category, svg, is_public, client_id !== undefined ? client_id : null, id, tenantId]
+      [name, category, svg, is_public, groupIds[0] || null, id, tenantId]
     );
 
-    console.log(`[API] Icon updated: ${id} - Client ID: ${client_id || 'none'}`);
+    // Replace group assignments
+    await pool.query('DELETE FROM icon_clients WHERE icon_id = $1', [iconUuid]);
+    if (groupIds.length) {
+      await pool.query(
+        `INSERT INTO icon_clients (icon_id, client_id)
+         SELECT $1, c.id FROM clients c
+         WHERE c.tenant_id = $2 AND c.id = ANY($3::uuid[])
+         ON CONFLICT DO NOTHING`,
+        [iconUuid, tenantId, groupIds]
+      );
+    }
+
+    console.log(`[API] Icon updated: ${id} - groups: ${groupIds.length}`);
     res.json({ ok: true, message: 'Icon updated successfully' });
   } catch (error) {
     console.error('[API] Error updating icon:', error);

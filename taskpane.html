@@ -398,10 +398,8 @@
         </div>
 
         <div class="form-group">
-          <label for="edit-icon-client">Client</label>
-          <select id="edit-icon-client" class="confirm-input">
-            <option value="">No client</option>
-          </select>
+          <label>Groups <span class="form-hint">(tap to assign — an icon can be in several)</span></label>
+          <div id="edit-icon-clients" class="group-chips"></div>
         </div>
 
         <div class="modal-actions">
@@ -418,10 +416,8 @@
         <p class="ss-review-sub">Approve stroke-based icons to add them to your library. Outlined (filled) icons can't be themed and are blocked.</p>
 
         <div class="form-group">
-          <label for="ss-review-client">Assign to client</label>
-          <select id="ss-review-client" class="confirm-input">
-            <option value="">No client</option>
-          </select>
+          <label>Assign to groups <span class="form-hint">(tap to select — applies to all approved)</span></label>
+          <div id="ss-review-clients" class="group-chips"></div>
         </div>
 
         <div id="ss-review-grid" class="ss-review-grid"></div>
