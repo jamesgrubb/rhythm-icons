@@ -1087,15 +1087,7 @@ Office.onReady(async ({ host }) => {
       }
       if (strokeWidth === null) strokeWidth = '2';
 
-      console.log(`[PPT] Extracted properties: stroke-width=${strokeWidth}, linecap=${strokeLinecap}, linejoin=${strokeLinejoin}`);
-
-      // Keep the stroke a constant on-screen size across icon sizes, but at the
-      // icon's OWN designed weight (viewBox units) rather than a fixed 2.
-      const scaleFactor = selectedSize / 24; // pixels per viewBox unit
-      const targetStrokePt = parseFloat(strokeWidth) || 2; // the icon's weight, in viewBox units
-      const adjustedStrokeWidth = targetStrokePt / scaleFactor;
-
-      console.log(`[PPT] Icon size: ${selectedSize}px, Scale: ${scaleFactor}x, Adjusted stroke: ${adjustedStrokeWidth.toFixed(3)} (renders as ${targetStrokePt}pt)`);
+      console.log(`[PPT] Extracted properties: linecap=${strokeLinecap}, linejoin=${strokeLinejoin}`);
 
       // Remove original styles and defs, we'll add cleaned version
       modifiedContent = modifiedContent.replace(/<style[\s\S]*?<\/style>/g, '');
@@ -1161,6 +1153,15 @@ Office.onReady(async ({ host }) => {
         backgroundCircle = `<circle cx="${cx}" cy="${cy}" r="${radius}" class="MsftOfcThm_Background2_Fill_v2" />
            <circle cx="${cx}" cy="${cy}" r="${radius}" class="${themeClass}_Fill_v2" opacity="0.35" />`;
       }
+
+      // Consistent stroke weight: a fixed 2pt for EVERY icon, derived from the
+      // FINAL viewBox width (the circle background expands it from 24→36, which
+      // would otherwise thin the stroke). render px = strokeWidth × selectedSize/vbW.
+      const vbW = (viewBox.split(/[\s,]+/).map(Number)[2]) || 24;
+      const scaleFactor = selectedSize / vbW;
+      const targetStrokePt = 2;
+      const adjustedStrokeWidth = targetStrokePt / scaleFactor;
+      console.log(`[PPT] size=${selectedSize}px vbW=${vbW} → stroke-width=${adjustedStrokeWidth.toFixed(3)} (constant ${targetStrokePt}pt)`);
 
       // Fallback colors for all theme options
       const fallbackColors = {
@@ -1243,14 +1244,7 @@ Office.onReady(async ({ host }) => {
         if (ljMatch) strokeLinejoin = ljMatch[1];
       }
 
-      console.log(`[PPT Fill] Extracted properties: stroke-width=${strokeWidth}, linecap=${strokeLinecap}, linejoin=${strokeLinejoin}`);
-
-      // Scale stroke-width to maintain constant 2pt appearance across all icon sizes
-      const scaleFactor = selectedSize / 24;
-      const targetStrokePt = 2;
-      const adjustedStrokeWidth = targetStrokePt / scaleFactor;
-
-      console.log(`[PPT Fill] Icon size: ${selectedSize}px, Scale: ${scaleFactor}x, Adjusted stroke: ${adjustedStrokeWidth.toFixed(3)} (renders as ${targetStrokePt}pt)`);
+      console.log(`[PPT Fill] Extracted properties: linecap=${strokeLinecap}, linejoin=${strokeLinejoin}`);
 
       // Remove original styles and defs
       modifiedContent = modifiedContent.replace(/<style[\s\S]*?<\/style>/g, '');
@@ -1289,6 +1283,10 @@ Office.onReady(async ({ host }) => {
         backgroundCircle = `<circle cx="${cx}" cy="${cy}" r="${radius}" class="MsftOfcThm_Background2_Fill_v2" />
            <circle cx="${cx}" cy="${cy}" r="${radius}" class="${fillClass}" opacity="0.35" />`;
       }
+
+      // Consistent 2pt stroke, derived from the FINAL viewBox width (circle bg expands it)
+      const vbW = (viewBox.split(/[\s,]+/).map(Number)[2]) || 24;
+      const adjustedStrokeWidth = 2 / (selectedSize / vbW);
 
       svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${selectedSize}" height="${selectedSize}" viewBox="${viewBox}">
         <style>
