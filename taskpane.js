@@ -50,7 +50,7 @@ Office.onReady(async ({ host }) => {
   const sizeBtns             = document.querySelectorAll(".size-btn");
   const colorBtns            = document.querySelectorAll(".color-btn");
   const circleBackgroundToggle = document.getElementById("circle-background-toggle");
-  const fillToggle           = document.getElementById("fill-toggle");
+  const colorBar             = document.getElementById("color-bar");
   const mixedStrokeToggle    = document.getElementById("mixed-stroke-toggle");
   const mixedStrokeColors    = document.getElementById("mixed-stroke-colors");
   const mixedColorBtns       = document.querySelectorAll(".mixed-color-btn");
@@ -79,7 +79,6 @@ Office.onReady(async ({ host }) => {
   let selectedSize   = 48;   // px — inserted icon size
   let selectedColor  = "Accent1";  // PowerPoint theme color
   let circleBackground = false;  // Add circle background to icons
-  let fillMode       = false;  // Use fill instead of stroke
   let mixedStroke    = false;  // Use multiple colors (randomly assigned)
   let mixedColor1    = "Accent1";  // First color for mixed stroke
   let mixedColor2    = "Accent2";  // Second color for mixed stroke
@@ -1050,14 +1049,14 @@ Office.onReady(async ({ host }) => {
     const svgContentMatch = svg.match(/<svg[^>]*>(.*?)<\/svg>/s);
     const svgContent = svgContentMatch ? svgContentMatch[1] : svg;
 
-    // Determine if icon uses stroke or fill (user can override with fillMode toggle)
-    // Check for any stroke-related attributes
+    // Library icons are stroke-based; use the stroke path when any stroke
+    // attribute is present (fill path kept only as a fallback for odd assets).
     const hasStrokeAttr = svg.includes('stroke="') || svg.includes("stroke='");
     const hasStrokeWidth = svg.includes('stroke-width');
     const hasStrokeLinecap = svg.includes('stroke-linecap');
     const hasStrokeLinejoin = svg.includes('stroke-linejoin');
 
-    const usesStroke = !fillMode && (hasStrokeAttr || hasStrokeWidth || hasStrokeLinecap || hasStrokeLinejoin);
+    const usesStroke = hasStrokeAttr || hasStrokeWidth || hasStrokeLinecap || hasStrokeLinejoin;
 
     if (usesStroke) {
       // For stroke icons: Use internal CSS with theme class (BrightCarbon method)
@@ -1494,18 +1493,14 @@ Office.onReady(async ({ host }) => {
     console.log("[Background] Circle background:", circleBackground);
   });
 
-  // ---- Fill toggle ----
-  fillToggle.addEventListener("change", () => {
-    fillMode = fillToggle.checked;
-    console.log("[Fill] Fill mode:", fillMode);
-  });
-
   // ---- Mixed stroke toggle ----
   mixedStrokeToggle.addEventListener("change", () => {
     mixedStroke = mixedStrokeToggle.checked;
 
-    // Show/hide color selector UI
+    // Show the mix-colour grids; hide the single Theme Color row while mixed is
+    // on (its colours are all already offered in the mix grids — less clutter).
     mixedStrokeColors.classList.toggle("hidden", !mixedStroke);
+    if (colorBar) colorBar.style.display = mixedStroke ? "none" : "";
 
     console.log("[MixedStroke] Mixed stroke mode:", mixedStroke);
   });
