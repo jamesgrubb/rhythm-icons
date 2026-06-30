@@ -70,6 +70,7 @@ Office.onReady(async ({ host }) => {
   const confirmCancelBtn     = document.getElementById("confirm-cancel");
   const iconClientSelect     = document.getElementById("icon-client");
   const addClientBtn         = document.getElementById("add-client-btn");
+  const uploadClients        = document.getElementById("upload-clients");
   const selectModeBtn        = document.getElementById("select-mode-btn");
   const selectionBar         = document.getElementById("selection-bar");
   const selectAllBtn         = document.getElementById("select-all-btn");
@@ -1916,6 +1917,7 @@ Office.onReady(async ({ host }) => {
   }
 
   function populateClientSelect() {
+    if (!iconClientSelect) return; // legacy dropdown removed from the upload modal
     // Clear existing options except the first one
     iconClientSelect.innerHTML = '<option value="">Select client...</option>';
 
@@ -1952,8 +1954,8 @@ Office.onReady(async ({ host }) => {
       allClients.push(newClient);
       populateClientSelect();
 
-      // Select the newly created client
-      iconClientSelect.value = newClient.id;
+      // Select the newly created client (legacy dropdown, if present)
+      if (iconClientSelect) iconClientSelect.value = newClient.id;
 
       showToast(`Client "${newClient.name}" created - now upload icons to assign`);
     } catch (error) {
@@ -2009,12 +2011,13 @@ Office.onReady(async ({ host }) => {
 
   // ---- Bulk Upload ----
   uploadBtn.addEventListener("click", async () => {
-    // Load clients when opening upload modal
+    // Load clients when opening upload modal, render group chips fresh
     await fetchClients();
+    renderGroupChips(uploadClients, []);
     uploadModal.classList.remove("hidden");
   });
 
-  addClientBtn.addEventListener("click", addNewClient);
+  if (addClientBtn) addClientBtn.addEventListener("click", addNewClient);
 
   closeUpload.addEventListener("click", () => {
     uploadModal.classList.add("hidden");
@@ -2106,17 +2109,11 @@ Office.onReady(async ({ host }) => {
           !match.includes('none') && !match.includes('fill:none')
         );
 
-        // Validate viewBox is exactly 24x24
+        // viewBox just needs to exist (any dimensions — sheet exports vary).
+        // One is auto-added above if the source had none, so this is a safety net.
         if (!finalViewBoxMatch) {
           console.error(`[Upload] ✗ "${iconName}": Missing viewBox`);
           failedFiles.push({ file: file.name, reason: "Missing viewBox attribute" });
-          continue;
-        }
-
-        const viewBox = finalViewBoxMatch[1];
-        if (viewBox !== "0 0 24 24") {
-          console.error(`[Upload] ✗ "${iconName}": Invalid viewBox "${viewBox}" (must be "0 0 24 24")`);
-          failedFiles.push({ file: file.name, reason: `Invalid viewBox "${viewBox}" (must be "0 0 24 24")` });
           continue;
         }
 
@@ -2171,7 +2168,7 @@ Office.onReady(async ({ host }) => {
       console.warn("[Upload] Failed files:", failedFiles);
       const failedList = failedFiles.map(f => `• ${f.file}: ${f.reason}`).join('\n');
       await customAlert(
-        `${failedFiles.length} file(s) failed validation:\n\n${failedList}\n\nRequired:\n✓ viewBox="0 0 24 24"\n✓ No fill attributes (stroke-based only)`,
+        `${failedFiles.length} file(s) failed validation:\n\n${failedList}\n\nRequired:\n✓ No fill attributes (stroke-based only)`,
         'Validation Failed'
       );
     }
@@ -2281,7 +2278,7 @@ Office.onReady(async ({ host }) => {
   copyCodeBtn.addEventListener("click", async () => {
     if (uploadedIcons.length === 0) return;
 
-    const selectedClientId = iconClientSelect.value || null;
+    const selectedClientIds = getSelectedGroupIds(uploadClients);
 
     copyCodeBtn.disabled = true;
     copyCodeBtn.textContent = "Uploading...";
@@ -2330,23 +2327,22 @@ Office.onReady(async ({ host }) => {
 
         // Upload icon if not skipped
         if (shouldUpload) {
-          // Determine client_id to send
-          let clientIdToSend;
-          if (isUpdate && !selectedClientId) {
-            // Preserve existing client_id when updating and no client selected in dropdown
-            clientIdToSend = icon._duplicateInfo.existing.client_id || null;
-            console.log(`[Upload] Preserving existing client_id: ${clientIdToSend}`);
+          // Assign the selected groups to every uploaded icon. When updating an
+          // existing icon and no groups are selected, keep its current groups.
+          let clientIdsToSend = selectedClientIds;
+          if (isUpdate && selectedClientIds.length === 0) {
+            const existing = icon._duplicateInfo.existing;
+            clientIdsToSend = (existing.clients || []).map(c => c.id);
+            console.log(`[Upload] Preserving existing groups:`, clientIdsToSend);
           } else {
-            // Use selected client_id for new icons or when explicitly changed
-            clientIdToSend = selectedClientId;
-            console.log(`[Upload] Using selected client_id: ${clientIdToSend}`);
+            console.log(`[Upload] Assigning groups:`, clientIdsToSend);
           }
 
           const payload = {
             id: iconToUpload.id,
             name: iconToUpload.name,
             svg: iconToUpload.svg,
-            client_id: clientIdToSend
+            client_ids: clientIdsToSend
           };
 
           console.log(`[Upload] Sending to API:`, { id: payload.id, name: payload.name });

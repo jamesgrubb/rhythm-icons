@@ -279,23 +279,13 @@
               </label>
 
               <div class="form-group">
-                <label for="icon-client">Client</label>
-                <div class="client-selector">
-                  <select id="icon-client">
-                    <option value="">Select client...</option>
-                  </select>
-                  <button type="button" id="add-client-btn" class="btn-secondary" title="Add new client">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                  </button>
-                </div>
+                <label>Groups <span class="form-hint">(tap to assign — applies to all uploaded)</span></label>
+                <div id="upload-clients" class="group-chips"></div>
               </div>
 
               <div class="upload-requirements">
                 <div class="requirements-title">Requirements:</div>
                 <ul>
-                  <li>viewBox="0 0 24 24"</li>
                   <li>No fill attributes (stroke-based only)</li>
                   <li>Recommended: stroke-width 2px</li>
                 </ul>
