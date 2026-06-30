@@ -440,7 +440,9 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 #size-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  row-gap: 6px;
   margin-bottom: 10px;
   padding: 0 2px;
 }
@@ -460,12 +462,25 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 }
 .size-btn:hover { border-color: var(--border-2); color: var(--text); }
 .size-btn.active { background: var(--bg-3); border-color: var(--border-2); color: var(--accent); }
-.result-count {
-  margin-left: auto;
+
+/* Circle background / Mixed stroke toggles — same style as size buttons */
+.toggle-options { display: flex; gap: 4px; flex-wrap: wrap; }
+.toggle-btn {
+  height: 22px;
+  padding: 0 9px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-2);
+  font-family: var(--font);
   font-size: 11px;
-  font-family: var(--mono);
-  color: var(--text-3);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.1s;
 }
+.toggle-btn:hover { border-color: var(--border-2); color: var(--text); }
+.toggle-btn.active { background: var(--bg-3); border-color: var(--accent); color: var(--accent); }
 
 /* ---- COLOR BAR ---- */
 #color-bar {
@@ -507,38 +522,6 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   background: var(--border-2);
   display: block;
   border: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-/* ---- BACKGROUND BAR ---- */
-#background-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding: 0 2px;
-}
-.background-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  user-select: none;
-}
-.background-label {
-  font-size: 11px;
-  color: var(--text-2);
-  font-weight: 500;
-}
-.background-toggle:hover .background-label {
-  color: var(--text);
-}
-#circle-background-toggle,
-#fill-toggle,
-#mixed-stroke-toggle {
-  width: 14px;
-  height: 14px;
-  cursor: pointer;
-  accent-color: var(--accent);
 }
 
 /* ---- MIXED STROKE COLOR SELECTOR ---- */

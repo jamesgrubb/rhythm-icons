@@ -503,7 +503,7 @@ Office.onReady(async ({ host }) => {
     } else {
       visible = filterIcons(allIcons, { client: activeClient, query: activeQuery });
     }
-    resultCount.textContent = `${visible.length} icon${visible.length !== 1 ? "s" : ""}`;
+    if (resultCount) resultCount.textContent = `${visible.length} icon${visible.length !== 1 ? "s" : ""}`;
 
     if (visible.length === 0) {
       iconGrid.innerHTML = "";
@@ -1472,14 +1472,18 @@ Office.onReady(async ({ host }) => {
   });
 
   // ---- Circle background toggle ----
-  circleBackgroundToggle.addEventListener("change", () => {
-    circleBackground = circleBackgroundToggle.checked;
+  circleBackgroundToggle.addEventListener("click", () => {
+    circleBackground = !circleBackground;
+    circleBackgroundToggle.classList.toggle("active", circleBackground);
+    circleBackgroundToggle.setAttribute("aria-pressed", String(circleBackground));
     console.log("[Background] Circle background:", circleBackground);
   });
 
   // ---- Mixed stroke toggle ----
-  mixedStrokeToggle.addEventListener("change", () => {
-    mixedStroke = mixedStrokeToggle.checked;
+  mixedStrokeToggle.addEventListener("click", () => {
+    mixedStroke = !mixedStroke;
+    mixedStrokeToggle.classList.toggle("active", mixedStroke);
+    mixedStrokeToggle.setAttribute("aria-pressed", String(mixedStroke));
 
     // Show the mix-colour grids; hide the single Theme Color row while mixed is
     // on (its colours are all already offered in the mix grids — less clutter).
@@ -2279,7 +2283,7 @@ Office.onReady(async ({ host }) => {
     ssOpen = open !== undefined ? open : !ssOpen;
     ssPanel.classList.toggle("hidden", !ssOpen);
     // Hide the curated grid + its option bars while searching Shutterstock
-    ["icon-grid", "size-bar", "color-bar", "background-bar", "empty-state", "ai-search-chip"].forEach(id => {
+    ["icon-grid", "size-bar", "color-bar", "empty-state", "ai-search-chip"].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = ssOpen ? "none" : "";
     });
