@@ -2100,15 +2100,6 @@ Office.onReady(async ({ host }) => {
         const strokeWidthMatch = svgContent.match(/stroke-width[:\s=]["']?([\d.]+)/);
         const hasStroke = svgContent.includes('stroke:') || svgContent.includes('stroke=');
 
-        // Check for fill attributes (not allowed in stroke-based icon system)
-        const hasFillAttribute = /fill=["'][^"']*["']/.test(svgContent) || /fill:\s*[^;}\s]+/.test(svgContent);
-        const fillMatches = svgContent.match(/fill=["']([^"']*)["']/g) || svgContent.match(/fill:\s*([^;}\s]+)/g);
-
-        // Filter out fill="none" which is acceptable
-        const hasInvalidFill = fillMatches && fillMatches.some(match =>
-          !match.includes('none') && !match.includes('fill:none')
-        );
-
         // viewBox just needs to exist (any dimensions — sheet exports vary).
         // One is auto-added above if the source had none, so this is a safety net.
         if (!finalViewBoxMatch) {
@@ -2117,12 +2108,12 @@ Office.onReady(async ({ host }) => {
           continue;
         }
 
-        // Validate no fill attributes (stroke-based icons only)
-        if (hasInvalidFill) {
-          console.error(`[Upload] ✗ "${iconName}": Contains fill attributes (stroke-based icons only)`);
-          failedFiles.push({ file: file.name, reason: "Contains fill attributes (use stroke-based icons only)" });
-          continue;
-        }
+        // Keep icons stroke-based: strip any active fill (attribute or inline
+        // style) to "none" instead of rejecting. Sheet/converted exports often
+        // carry stray fills; the preview shows how each icon will actually render.
+        svgContent = svgContent
+          .replace(/fill\s*=\s*["'][^"']*["']/gi, (m) => /none/i.test(m) ? m : 'fill="none"')
+          .replace(/fill\s*:\s*[^;"'}\s]+/gi, (m) => /none/i.test(m) ? m : 'fill:none');
 
         // Passed all validations
         console.log(`[Upload] ✓ "${iconName}": Passed all validations`);
