@@ -698,8 +698,8 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-3);
-  border: 1px solid var(--border-2);
+  background: #c4c4cc;               /* light grey, inactive */
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 5px;
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s, transform 0.12s var(--ease);
@@ -712,7 +712,7 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 }
 .icon-edit-btn svg, .icon-edit-btn svg *,
 .icon-delete-btn svg, .icon-delete-btn svg * {
-  stroke: #111113 !important;       /* off-black stroke */
+  stroke: #1c1c20 !important;        /* off-black stroke on light grey */
   stroke-width: 2 !important;
   fill: none !important;
 }
