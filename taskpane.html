@@ -98,6 +98,15 @@
             <button type="button" id="circle-background-toggle" class="toggle-btn" aria-pressed="false">Circle background</button>
             <button type="button" id="mixed-stroke-toggle" class="toggle-btn" aria-pressed="false">Mixed stroke</button>
           </div>
+          <button type="button" id="select-mode-btn" class="toggle-btn select-mode-btn" style="display: none;">Select</button>
+        </div>
+
+        <!-- Bulk selection toolbar (admin select-mode) -->
+        <div id="selection-bar" class="selection-bar hidden">
+          <button type="button" id="select-all-btn" class="toggle-btn">Select all</button>
+          <span id="selection-count" class="selection-count">0 selected</span>
+          <button type="button" id="selection-delete-btn" class="btn-bulk-delete" disabled>Delete</button>
+          <button type="button" id="selection-cancel-btn" class="toggle-btn">Cancel</button>
         </div>
 
         <div id="color-bar">

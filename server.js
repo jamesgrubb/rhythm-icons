@@ -867,6 +867,31 @@ app.delete("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, r
   }
 });
 
+// POST /api/icons/bulk-delete — delete multiple icons by icon_id (admin only)
+app.post("/api/icons/bulk-delete", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const tenantId = req.user.tenantId;
+  const { ids } = req.body;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: "Provide a non-empty 'ids' array" });
+  }
+  const iconIds = [...new Set(ids.map(String))];
+
+  try {
+    // Tenant-scoped delete; icon_clients rows cascade via the icons.id FK
+    const result = await pool.query(
+      'DELETE FROM icons WHERE tenant_id = $1 AND icon_id = ANY($2::text[]) RETURNING icon_id',
+      [tenantId, iconIds]
+    );
+
+    console.log('[API] Bulk delete by admin:', req.user.email, '-', result.rowCount, 'icons');
+    res.json({ ok: true, deleted: result.rowCount });
+  } catch (error) {
+    console.error('[API] Error bulk-deleting icons:', error);
+    res.status(500).json({ error: 'Failed to delete icons' });
+  }
+});
+
 // Run migrations before starting server (production only)
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {

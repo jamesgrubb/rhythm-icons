@@ -70,8 +70,17 @@ Office.onReady(async ({ host }) => {
   const confirmCancelBtn     = document.getElementById("confirm-cancel");
   const iconClientSelect     = document.getElementById("icon-client");
   const addClientBtn         = document.getElementById("add-client-btn");
+  const selectModeBtn        = document.getElementById("select-mode-btn");
+  const selectionBar         = document.getElementById("selection-bar");
+  const selectAllBtn         = document.getElementById("select-all-btn");
+  const selectionCount       = document.getElementById("selection-count");
+  const selectionDeleteBtn   = document.getElementById("selection-delete-btn");
+  const selectionCancelBtn   = document.getElementById("selection-cancel-btn");
 
   // ---- State ----
+  let selectionMode  = false;        // Bulk-select mode (admin)
+  let selectedIds    = new Set();    // icon.id strings currently selected
+  let lastVisibleIcons = [];         // icons rendered in the current view
   let allIcons       = [];
   let activeClient   = "All";
   let activeQuery    = "";
@@ -444,6 +453,8 @@ Office.onReady(async ({ host }) => {
       btn.textContent = `${client} (${count})`;
       btn.addEventListener("click", () => {
         activeClient = client;
+        // Switching groups clears any in-progress selection to avoid cross-group deletes
+        if (selectionMode) { selectedIds.clear(); updateSelectionUI(); }
         // Re-render tabs to update counts and active state
         renderClientTabs(clients);
         renderGrid();
@@ -504,6 +515,7 @@ Office.onReady(async ({ host }) => {
       visible = filterIcons(allIcons, { client: activeClient, query: activeQuery });
     }
     if (resultCount) resultCount.textContent = `${visible.length} icon${visible.length !== 1 ? "s" : ""}`;
+    lastVisibleIcons = visible;
 
     if (visible.length === 0) {
       iconGrid.innerHTML = "";
@@ -529,41 +541,54 @@ Office.onReady(async ({ host }) => {
       // Admins manage their own tenant's icons; everyone else sees icon + name only
       const isAdminForIcon = currentUserRole === 'admin' && currentUserProfile &&
         (!icon.tenant_name || icon.tenant_name === currentUserProfile.tenant.name);
+      const selecting = selectionMode && isAdminForIcon;
+      const showActions = isAdminForIcon && !selecting;
 
       card.innerHTML = `
         <div class="card-icon">${thumbnailSvg}</div>
-        <div class="card-meta${isAdminForIcon ? "" : " no-actions"}">
+        <div class="card-meta${showActions ? "" : " no-actions"}">
           <span class="icon-name">${icon.name}</span>
-          ${isAdminForIcon ? `<div class="card-actions"></div>` : ""}
+          ${showActions ? `<div class="card-actions"></div>` : ""}
         </div>`;
 
-      // Edit + delete buttons (admins only), shown in the inactive grey state
-      if (isAdminForIcon) {
-        const actions = card.querySelector(".card-actions");
+      if (selecting) {
+        // Selection mode: clicking the card toggles selection (no insert)
+        card.classList.add("selectable");
+        if (selectedIds.has(icon.id)) card.classList.add("selected");
+        const check = document.createElement("div");
+        check.className = "select-check";
+        check.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+        card.appendChild(check);
+        card.addEventListener("click", () => toggleSelect(icon, card));
+      } else {
+        // Edit + delete buttons (admins only), shown in the inactive grey state
+        if (showActions) {
+          const actions = card.querySelector(".card-actions");
 
-        const editBtn = document.createElement("button");
-        editBtn.className = "icon-edit-btn";
-        editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
-        editBtn.title = "Edit icon";
-        editBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          editIcon(icon);
-        });
-        actions.appendChild(editBtn);
+          const editBtn = document.createElement("button");
+          editBtn.className = "icon-edit-btn";
+          editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+          editBtn.title = "Edit icon";
+          editBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            editIcon(icon);
+          });
+          actions.appendChild(editBtn);
 
-        const deleteBtn = document.createElement("button");
-        deleteBtn.className = "icon-delete-btn";
-        deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
-        deleteBtn.title = "Delete icon";
-        deleteBtn.addEventListener("click", (e) => {
-          e.stopPropagation(); // Prevent card click (insert)
-          deleteIcon(icon);
-        });
-        actions.appendChild(deleteBtn);
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "icon-delete-btn";
+          deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+          deleteBtn.title = "Delete icon";
+          deleteBtn.addEventListener("click", (e) => {
+            e.stopPropagation(); // Prevent card click (insert)
+            deleteIcon(icon);
+          });
+          actions.appendChild(deleteBtn);
+        }
+
+        // Clicking the card inserts the icon (edit/delete buttons stop propagation)
+        card.addEventListener("click", () => insertIcon(icon, card));
       }
-
-      // Clicking the card inserts the icon (edit/delete buttons stop propagation)
-      card.addEventListener("click", () => insertIcon(icon, card));
 
       iconGrid.appendChild(card);
     });
@@ -716,6 +741,104 @@ Office.onReady(async ({ host }) => {
     saveBtn.addEventListener("click", onSave);
     modal.addEventListener("click", onBackdrop);
     document.addEventListener("keydown", onKey);
+  }
+
+  // ---- Bulk select + delete (admin) ----
+  function enterSelectionMode() {
+    if (currentUserRole !== 'admin') return;
+    selectionMode = true;
+    selectedIds.clear();
+    selectionBar.classList.remove("hidden");
+    selectModeBtn.classList.add("active");
+    renderGrid();
+    updateSelectionUI();
+  }
+
+  function exitSelectionMode() {
+    selectionMode = false;
+    selectedIds.clear();
+    selectionBar.classList.add("hidden");
+    selectModeBtn.classList.remove("active");
+    renderGrid();
+  }
+
+  function toggleSelect(icon, card) {
+    if (selectedIds.has(icon.id)) {
+      selectedIds.delete(icon.id);
+      card.classList.remove("selected");
+    } else {
+      selectedIds.add(icon.id);
+      card.classList.add("selected");
+    }
+    updateSelectionUI();
+  }
+
+  function updateSelectionUI() {
+    const n = selectedIds.size;
+    const total = lastVisibleIcons.length;
+    selectionCount.textContent = `${n} selected`;
+    selectionDeleteBtn.disabled = n === 0;
+    selectionDeleteBtn.textContent = n > 0 ? `Delete (${n})` : "Delete";
+    selectAllBtn.textContent = (total > 0 && n >= total) ? "Clear" : "Select all";
+  }
+
+  function toggleSelectAll() {
+    const allSelected = lastVisibleIcons.length > 0 &&
+      lastVisibleIcons.every(i => selectedIds.has(i.id));
+    if (allSelected) {
+      selectedIds.clear();
+    } else {
+      lastVisibleIcons.forEach(i => selectedIds.add(i.id));
+    }
+    renderGrid();
+    updateSelectionUI();
+  }
+
+  async function deleteSelected() {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+
+    const groupLabel = (activeClient && activeClient !== "All") ? ` from "${activeClient}"` : "";
+    const confirmed = await customConfirm(
+      `Delete ${ids.length} icon${ids.length !== 1 ? "s" : ""}${groupLabel}? This permanently removes ${ids.length !== 1 ? "them" : "it"} from the library and can't be undone.`,
+      "Delete icons"
+    );
+    if (!confirmed) return;
+
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/icons/bulk-delete`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ids })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to delete icons");
+      }
+      const data = await res.json();
+
+      const removed = new Set(ids);
+      allIcons = allIcons.filter(i => !removed.has(i.id));
+
+      exitSelectionMode();
+      invalidateCountCache();
+      renderClientTabs(getClients(allIcons));
+      renderGrid();
+      showToast(`${data.deleted} icon${data.deleted !== 1 ? "s" : ""} deleted`);
+    } catch (error) {
+      console.error("[BulkDelete] Error:", error);
+      showToast(`Error: ${error.message}`);
+    }
+  }
+
+  if (selectModeBtn) {
+    selectModeBtn.addEventListener("click", () => {
+      selectionMode ? exitSelectionMode() : enterSelectionMode();
+    });
+    selectAllBtn.addEventListener("click", toggleSelectAll);
+    selectionCancelBtn.addEventListener("click", exitSelectionMode);
+    selectionDeleteBtn.addEventListener("click", deleteSelected);
   }
 
   // ---- Insert icon into document ----
@@ -1606,9 +1729,11 @@ Office.onReady(async ({ host }) => {
     if (currentUserRole === 'admin') {
       if (uploadBtn) uploadBtn.style.display = 'flex';
       if (adminPanelBtn) adminPanelBtn.style.display = 'flex';
+      if (selectModeBtn) selectModeBtn.style.display = 'inline-flex';
     } else {
       if (uploadBtn) uploadBtn.style.display = 'none';
       if (adminPanelBtn) adminPanelBtn.style.display = 'none';
+      if (selectModeBtn) selectModeBtn.style.display = 'none';
     }
 
     // Update header with user name + role badge
