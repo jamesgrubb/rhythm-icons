@@ -55,7 +55,6 @@ Office.onReady(async ({ host }) => {
   const mixedStrokeColors    = document.getElementById("mixed-stroke-colors");
   const mixedColorBtns       = document.querySelectorAll(".mixed-color-btn");
   const uploadBtn            = document.getElementById("upload-btn");
-  const editModeBtn          = document.getElementById("edit-mode-btn");
   const uploadModal          = document.getElementById("upload-modal");
   const closeUpload          = document.getElementById("close-upload");
   const svgFileInput         = document.getElementById("svg-file-input");
@@ -86,7 +85,6 @@ Office.onReady(async ({ host }) => {
   let toastTimer     = null;
   let currentUserRole = null;  // 'admin', 'user', 'viewer'
   let currentUserProfile = null; // { name, email, role, tenant }
-  let isEditMode = false;  // Edit mode for deleting icons
   let themeColors = null; // Actual PowerPoint theme colors (fetched via API)
   let themeRefreshInterval = null; // Interval for periodic theme color refresh
   let allClients = []; // All clients for current tenant
@@ -528,40 +526,44 @@ Office.onReady(async ({ host }) => {
       thumbnailSvg = thumbnailSvg.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
       thumbnailSvg = thumbnailSvg.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
 
-      card.innerHTML = `${thumbnailSvg}<span class="icon-name">${icon.name}</span>`;
+      // Admins manage their own tenant's icons; everyone else sees icon + name only
+      const isAdminForIcon = currentUserRole === 'admin' && currentUserProfile &&
+        (!icon.tenant_name || icon.tenant_name === currentUserProfile.tenant.name);
 
-      // Add edit and delete buttons in edit mode for admins on their own tenant's icons
-      if (isEditMode && currentUserRole === 'admin' && currentUserProfile) {
-        const isOwnIcon = !icon.tenant_name || icon.tenant_name === currentUserProfile.tenant.name;
-        if (isOwnIcon) {
-          // Edit button
-          const editBtn = document.createElement("button");
-          editBtn.className = "icon-edit-btn";
-          editBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
-          editBtn.title = "Edit icon";
-          editBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            editIcon(icon);
-          });
-          card.appendChild(editBtn);
+      card.innerHTML = `
+        <div class="card-icon">${thumbnailSvg}</div>
+        <div class="card-meta${isAdminForIcon ? "" : " no-actions"}">
+          <span class="icon-name">${icon.name}</span>
+          ${isAdminForIcon ? `<div class="card-actions"></div>` : ""}
+        </div>`;
 
-          // Delete button
-          const deleteBtn = document.createElement("button");
-          deleteBtn.className = "icon-delete-btn";
-          deleteBtn.innerHTML = "&times;";
-          deleteBtn.title = "Delete icon";
-          deleteBtn.addEventListener("click", (e) => {
-            e.stopPropagation(); // Prevent card click (insert)
-            deleteIcon(icon);
-          });
-          card.appendChild(deleteBtn);
-        }
+      // Edit + delete buttons (admins only), shown in the inactive grey state
+      if (isAdminForIcon) {
+        const actions = card.querySelector(".card-actions");
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "icon-edit-btn";
+        editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+        editBtn.title = "Edit icon";
+        editBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          editIcon(icon);
+        });
+        actions.appendChild(editBtn);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "icon-delete-btn";
+        deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+        deleteBtn.title = "Delete icon";
+        deleteBtn.addEventListener("click", (e) => {
+          e.stopPropagation(); // Prevent card click (insert)
+          deleteIcon(icon);
+        });
+        actions.appendChild(deleteBtn);
       }
 
-      // Only allow insertion when not in edit mode
-      if (!isEditMode) {
-        card.addEventListener("click", () => insertIcon(icon, card));
-      }
+      // Clicking the card inserts the icon (edit/delete buttons stop propagation)
+      card.addEventListener("click", () => insertIcon(icon, card));
 
       iconGrid.appendChild(card);
     });
@@ -1541,31 +1543,6 @@ Office.onReady(async ({ host }) => {
     }
   });
 
-  // ---- Edit Mode Toggle ----
-  editModeBtn.addEventListener("click", () => {
-    isEditMode = !isEditMode;
-
-    // Toggle icons and visual state
-    const normalIcon = document.getElementById("edit-icon-normal");
-    const activeIcon = document.getElementById("edit-icon-active");
-    if (isEditMode) {
-      normalIcon.style.display = "none";
-      activeIcon.style.display = "block";
-      editModeBtn.classList.add("active");
-      editModeBtn.title = "Exit edit mode";
-      mainScreen.classList.add("edit-mode");
-      showToast("Tap icons to delete");
-    } else {
-      normalIcon.style.display = "block";
-      activeIcon.style.display = "none";
-      editModeBtn.classList.remove("active");
-      editModeBtn.title = "Edit library";
-      mainScreen.classList.remove("edit-mode");
-    }
-
-    renderGrid(); // Re-render to show/hide delete buttons
-  });
-
   // ---- Sign-out ----
   signoutBtn.addEventListener("click", async () => {
     try {
@@ -1584,18 +1561,15 @@ Office.onReady(async ({ host }) => {
   // ---- Update UI based on user role ----
   function updateUIForRole() {
     const uploadBtn = document.getElementById('upload-btn');
-    const editModeBtn = document.getElementById('edit-mode-btn');
     const adminPanelBtn = document.getElementById('admin-panel-btn');
 
     // Show/hide buttons based on role
     const shutterstockBtn = document.getElementById('shutterstock-btn');
     if (currentUserRole === 'admin') {
       if (uploadBtn) uploadBtn.style.display = 'flex';
-      if (editModeBtn) editModeBtn.style.display = 'flex';
       if (adminPanelBtn) adminPanelBtn.style.display = 'flex';
     } else {
       if (uploadBtn) uploadBtn.style.display = 'none';
-      if (editModeBtn) editModeBtn.style.display = 'none';
       if (adminPanelBtn) adminPanelBtn.style.display = 'none';
     }
     // Shutterstock search is open to all signed-in roles;
