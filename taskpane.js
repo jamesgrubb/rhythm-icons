@@ -926,6 +926,9 @@ Office.onReady(async ({ host }) => {
         btn.title = `${colorName}: ${hexColor}`;
       }
     });
+
+    // Keep the mixed-stroke swatches in sync (some load paths only call this one)
+    updateMixedStrokeSwatches();
   }
 
   // ---- Update mixed stroke color swatches ----
