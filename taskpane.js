@@ -71,6 +71,7 @@ Office.onReady(async ({ host }) => {
   const iconClientSelect     = document.getElementById("icon-client");
   const addClientBtn         = document.getElementById("add-client-btn");
   const uploadClients        = document.getElementById("upload-clients");
+  const uploadStatus         = document.getElementById("upload-status");
   const selectModeBtn        = document.getElementById("select-mode-btn");
   const selectionBar         = document.getElementById("selection-bar");
   const selectAllBtn         = document.getElementById("select-all-btn");
@@ -82,6 +83,7 @@ Office.onReady(async ({ host }) => {
   let selectionMode  = false;        // Bulk-select mode (admin)
   let selectedIds    = new Set();    // icon.id strings currently selected
   let lastVisibleIcons = [];         // icons rendered in the current view
+  let sheetQueue     = [];           // multi-icon sheets awaiting split + review
   let allIcons       = [];
   let activeClient   = "All";
   let activeQuery    = "";
@@ -2030,6 +2032,70 @@ Office.onReady(async ({ host }) => {
     }
   });
 
+  // A multi-icon "sheet" is an SVG whose densest level holds several sibling
+  // <g> groups (one per icon) — the same signal the server segments by. Single
+  // icons have few/no sibling groups, so they stay on the one-icon path.
+  const SHEET_GROUP_THRESHOLD = 4;
+  function isSheetSvg(svgText) {
+    try {
+      const doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
+      if (doc.querySelector("parsererror")) return false;
+      let maxDirectGroups = 0;
+      const visit = (node) => {
+        let direct = 0;
+        for (const child of node.children) {
+          if (child.tagName && child.tagName.toLowerCase() === "g") direct++;
+        }
+        if (direct > maxDirectGroups) maxDirectGroups = direct;
+        for (const child of node.children) visit(child);
+      };
+      const svgEl = doc.querySelector("svg");
+      if (svgEl) visit(svgEl);
+      return maxDirectGroups >= SHEET_GROUP_THRESHOLD;
+    } catch {
+      return false;
+    }
+  }
+
+  // Send a sheet through the segment → name → review pipeline.
+  async function uploadSheet(file) {
+    uploadStatus.classList.remove("hidden", "upload-status-error");
+    uploadStatus.textContent = `Splitting "${file.name}" into icons…`;
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/shutterstock/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/octet-stream",
+          "X-Filename": encodeURIComponent(file.name)
+        },
+        body: file
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || body.error || `HTTP ${res.status}`);
+      }
+      const { job_id } = await res.json();
+      ssPollJob(job_id, document.createElement("button"), uploadStatus);
+    } catch (err) {
+      console.error("[Sheet] Upload failed:", err);
+      uploadStatus.textContent = `Failed to split "${file.name}": ${err.message}`;
+      uploadStatus.classList.add("upload-status-error");
+      processNextSheet(); // continue with any remaining sheets
+    }
+  }
+
+  // Process queued sheets one at a time (each opens the review modal).
+  function processNextSheet() {
+    const next = sheetQueue.shift();
+    if (next) {
+      uploadSheet(next);
+    } else {
+      uploadStatus.classList.add("hidden");
+    }
+  }
+
   svgFileInput.addEventListener("change", async (e) => {
     const files = Array.from(e.target.files);
     console.log("[Upload] Selected", files.length, "files");
@@ -2038,6 +2104,7 @@ Office.onReady(async ({ host }) => {
 
     uploadedIcons = [];
     const failedFiles = []; // Track validation failures
+    const sheetFiles = [];  // Multi-icon sheets routed to the splitter
 
     for (const file of files) {
       console.log("[Upload] Processing:", file.name, "Type:", file.type, "Size:", file.size);
@@ -2051,6 +2118,14 @@ Office.onReady(async ({ host }) => {
       try {
         let svgContent = await file.text();
         console.log("[Upload] Read file content, length:", svgContent.length);
+
+        // Auto-detect a multi-icon sheet and route it to the splitter pipeline
+        // instead of importing the whole sheet as a single icon.
+        if (isSheetSvg(svgContent)) {
+          console.log(`[Upload] "${file.name}" looks like a sheet — routing to splitter`);
+          sheetFiles.push(file);
+          continue;
+        }
 
         // Extract icon name and ID from filename
         let iconName = file.name.replace('.svg', '').replace(/[-_]/g, ' ');
@@ -2192,10 +2267,20 @@ Office.onReady(async ({ host }) => {
       if (failedFiles.length > 0) {
         showToast(`${uploadedIcons.length} passed, ${failedFiles.length} failed validation`);
       }
-    } else {
+    } else if (sheetFiles.length === 0) {
       console.log("[Upload] No valid SVG files found");
       showToast("No valid SVG files - check requirements");
     }
+
+    // Sheets: split + name + review, one sheet at a time
+    if (sheetFiles.length > 0) {
+      console.log(`[Upload] ${sheetFiles.length} sheet(s) routed to splitter`);
+      sheetQueue = sheetFiles.slice();
+      processNextSheet();
+    }
+
+    // Allow re-selecting the same file(s) again
+    e.target.value = "";
   });
 
   function renderPreview() {
@@ -2630,6 +2715,10 @@ Office.onReady(async ({ host }) => {
     ssReviewJobId = jobId;
     ssCandidates = candidates;
 
+    // Hand off from the upload modal to the review modal
+    uploadModal.classList.add("hidden");
+    uploadStatus.classList.add("hidden");
+
     // Group toggle-chips (same control as the edit modal)
     await fetchClients();
     renderGroupChips(ssReviewClients, []);
@@ -2689,7 +2778,7 @@ Office.onReady(async ({ host }) => {
         const res = await fetch(`${ICON_API_BASE}/icons`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ id: iconId, name, svg: cand.svg, category: "Shutterstock", client_ids: clientIds, tags })
+          body: JSON.stringify({ id: iconId, name, svg: cand.svg, category: "Uncategorized", client_ids: clientIds, tags })
         });
 
         if (res.ok) {
@@ -2710,6 +2799,7 @@ Office.onReady(async ({ host }) => {
       ssReviewModal.classList.add("hidden");
       ssResetUploadButton();
       showToast(`${added} icon${added !== 1 ? "s" : ""} added${failed ? `, ${failed} failed` : ""}`);
+      processNextSheet(); // continue with any remaining sheets
     } catch (err) {
       console.error("[Shutterstock] Approve failed:", err);
       showToast("Failed to add icons");
@@ -2718,6 +2808,14 @@ Office.onReady(async ({ host }) => {
       ssReviewApprove.textContent = "Add Selected to Library";
     }
   }
+
+  // Wire the review modal's Add / Discard buttons (the old Shutterstock panel
+  // that used to wire these was removed; sheet uploads drive this now).
+  ssReviewApprove.addEventListener("click", ssApproveSelected);
+  ssReviewCancel.addEventListener("click", () => {
+    ssReviewModal.classList.add("hidden");
+    processNextSheet(); // move on to the next queued sheet, if any
+  });
 
   function ssResetUploadButton() {
     const uploadBtn = document.getElementById("ss-upload-btn");
