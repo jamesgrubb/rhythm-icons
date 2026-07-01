@@ -672,7 +672,7 @@ Office.onReady(async ({ host }) => {
 
     // Render group toggle-chips, pre-selecting the icon's current groups
     const currentGroupIds = (icon.clients || []).map(c => c.id);
-    renderGroupChips(clientsContainer, currentGroupIds);
+    renderGroupChips(clientsContainer, currentGroupIds, { includeUnassigned: true });
 
     // Show modal
     modal.classList.remove("hidden");
@@ -1890,14 +1890,40 @@ Office.onReady(async ({ host }) => {
 
   // ---- Group toggle-chip selector (shared by edit + review modals) ----
   // Renders one chip per group; tap to toggle. selectedIds pre-selects.
-  function renderGroupChips(container, selectedIds) {
+  function renderGroupChips(container, selectedIds, { includeUnassigned = false } = {}) {
     if (!container) return;
     const selected = new Set((selectedIds || []).map(String));
     container.innerHTML = "";
-    if (!allClients.length) {
+    if (!allClients.length && !includeUnassigned) {
       container.innerHTML = '<span class="group-chips-empty">No groups yet.</span>';
       return;
     }
+
+    const realChips = [];
+    let unassignedChip = null;
+
+    // Keep the "Unassigned" chip in sync: it's on exactly when no group is chosen
+    const syncUnassigned = () => {
+      if (!unassignedChip) return;
+      const anyReal = realChips.some(c => c.classList.contains("selected"));
+      unassignedChip.classList.toggle("selected", !anyReal);
+      unassignedChip.setAttribute("aria-pressed", !anyReal ? "true" : "false");
+    };
+
+    if (includeUnassigned) {
+      unassignedChip = document.createElement("button");
+      unassignedChip.type = "button";
+      unassignedChip.className = "group-chip group-chip-unassigned";
+      unassignedChip.dataset.unassigned = "1";
+      unassignedChip.textContent = "Unassigned";
+      unassignedChip.addEventListener("click", () => {
+        // Choosing Unassigned clears every real group selection
+        realChips.forEach(c => { c.classList.remove("selected"); c.setAttribute("aria-pressed", "false"); });
+        syncUnassigned();
+      });
+      container.appendChild(unassignedChip);
+    }
+
     allClients.forEach(client => {
       const chip = document.createElement("button");
       chip.type = "button";
@@ -1908,14 +1934,21 @@ Office.onReady(async ({ host }) => {
       chip.addEventListener("click", () => {
         const on = chip.classList.toggle("selected");
         chip.setAttribute("aria-pressed", on ? "true" : "false");
+        syncUnassigned();
       });
+      realChips.push(chip);
       container.appendChild(chip);
     });
+
+    syncUnassigned();
   }
 
   function getSelectedGroupIds(container) {
     if (!container) return [];
-    return [...container.querySelectorAll(".group-chip.selected")].map(c => c.dataset.clientId);
+    // Only real group chips carry a clientId; the "Unassigned" chip is excluded
+    return [...container.querySelectorAll(".group-chip.selected")]
+      .map(c => c.dataset.clientId)
+      .filter(Boolean);
   }
 
   function populateClientSelect() {
@@ -2015,7 +2048,7 @@ Office.onReady(async ({ host }) => {
   uploadBtn.addEventListener("click", async () => {
     // Load clients when opening upload modal, render group chips fresh
     await fetchClients();
-    renderGroupChips(uploadClients, []);
+    renderGroupChips(uploadClients, [], { includeUnassigned: true });
     uploadModal.classList.remove("hidden");
   });
 
@@ -2721,7 +2754,7 @@ Office.onReady(async ({ host }) => {
 
     // Group toggle-chips (same control as the edit modal)
     await fetchClients();
-    renderGroupChips(ssReviewClients, []);
+    renderGroupChips(ssReviewClients, [], { includeUnassigned: true });
 
     ssReviewGrid.innerHTML = "";
     candidates.forEach((cand, idx) => {

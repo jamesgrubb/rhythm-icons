@@ -1668,6 +1668,11 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   color: var(--accent-fg);
   font-weight: 600;
 }
+/* The "no group" default option reads a touch quieter when not chosen */
+.group-chip-unassigned:not(.selected) {
+  border-style: dashed;
+  color: var(--text-3);
+}
 
 .group-chips-empty {
   font-size: 11px;
