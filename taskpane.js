@@ -536,12 +536,9 @@ Office.onReady(async ({ host }) => {
       card.className = "icon-card";
       card.title = icon.name;
 
-      // Prepare SVG for thumbnail: strip hardcoded stroke/fill colors so CSS can style it
-      let thumbnailSvg = icon.svg;
-      thumbnailSvg = thumbnailSvg.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="currentColor"');
-      thumbnailSvg = thumbnailSvg.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="currentColor"');
-      thumbnailSvg = thumbnailSvg.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
-      thumbnailSvg = thumbnailSvg.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
+      // Prepare SVG for thumbnail: normalize stroke/fill colours so it renders
+      // in the theme colour (handles <style> blocks, not just attributes).
+      let thumbnailSvg = normalizeSvgDisplay(icon.svg);
 
       // Admins can edit their own tenant's icons and delete their own OR shared
       // (public/seeded) icons. Everyone else sees icon + name only.
@@ -674,6 +671,19 @@ Office.onReady(async ({ host }) => {
     return svg;
   }
 
+  // Normalize an SVG for on-screen display: stroke colours → currentColor and
+  // fills → none, covering attributes, inline styles, AND <style> blocks (the
+  // format Illustrator exports). This makes every icon render in the theme
+  // colour regardless of how its stored SVG hardcodes colours. Stroke-width,
+  // line caps/joins, and stroke/fill "none" are left intact.
+  function normalizeSvgDisplay(svg) {
+    return (svg || "")
+      .replace(/stroke\s*=\s*["'][^"']*["']/gi, m => /none/i.test(m) ? m : 'stroke="currentColor"')
+      .replace(/stroke\s*:\s*[^;"'}\s]+/gi, m => /none/i.test(m) ? m : 'stroke:currentColor')
+      .replace(/fill\s*=\s*["'][^"']*["']/gi, m => /none/i.test(m) ? m : 'fill="none"')
+      .replace(/fill\s*:\s*[^;"'}\s]+/gi, m => /none/i.test(m) ? m : 'fill:none');
+  }
+
   // ---- Edit icon (admin only) ----
   async function editIcon(icon) {
     if (currentUserRole !== 'admin') {
@@ -695,14 +705,7 @@ Office.onReady(async ({ host }) => {
     const svgStatus = document.getElementById("edit-svg-status");
 
     // Render an SVG into the preview with library styling (stroke follows theme)
-    const showPreview = (svg) => {
-      let s = svg;
-      s = s.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="currentColor"');
-      s = s.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="currentColor"');
-      s = s.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
-      s = s.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
-      svgPreview.innerHTML = s;
-    };
+    const showPreview = (svg) => { svgPreview.innerHTML = normalizeSvgDisplay(svg); };
 
     // Holds a pasted replacement SVG until Save (null = keep existing artwork)
     let pendingSvg = null;
