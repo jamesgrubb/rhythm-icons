@@ -901,6 +901,36 @@ app.post("/api/icons/bulk-delete", requireAuth, ensureTenantExists, extractUserR
   }
 });
 
+// POST /api/icons/name-svg — auto-name a single SVG via Gemini (admin only),
+// the same naming used when segmenting sheets. Returns { name, tags }.
+app.post("/api/icons/name-svg", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { svg } = req.body;
+  if (!svg || typeof svg !== 'string' || !/<svg[\s>]/i.test(svg)) {
+    return res.status(400).json({ error: "Provide SVG markup" });
+  }
+  try {
+    const gemini = require("./lib/gemini");
+    const { Resvg } = require("@resvg/resvg-js");
+
+    // Render to a small PNG (drop any existing width/height so 96x96 applies)
+    let render = svg.replace(/\s(width|height)\s*=\s*["'][^"']*["']/gi, '')
+                    .replace(/<svg\b/i, '<svg width="96" height="96"');
+    let png;
+    try {
+      png = new Resvg(render, { background: "white" }).render().asPng();
+    } catch (e) {
+      return res.status(400).json({ error: "Could not render SVG" });
+    }
+
+    const names = await gemini.nameIconsOrdered([png]);
+    const meta = names && names[0];
+    res.json({ name: (meta && meta.label) || null, tags: (meta && meta.tags) || [] });
+  } catch (error) {
+    console.error("[API] name-svg error:", error.message);
+    res.status(500).json({ error: "Failed to name icon" });
+  }
+});
+
 // Run migrations before starting server (production only)
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {

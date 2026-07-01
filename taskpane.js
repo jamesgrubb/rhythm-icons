@@ -2328,25 +2328,48 @@ Office.onReady(async ({ host }) => {
     e.target.value = "";
   });
 
-  // ---- Paste a single icon (from Illustrator) into the upload batch ----
-  function addPastedIcon() {
-    const name = pasteIconName.value.trim();
-    const raw = pasteIconSvg.value.trim();
-    const setErr = msg => { pasteIconStatus.className = "svg-paste-status svg-paste-error"; pasteIconStatus.textContent = msg; };
+  // Auto-name a single SVG via Gemini (same naming used for sheet segments).
+  async function autoNameSvg(svg) {
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/icons/name-svg`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ svg })
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.name || null;
+    } catch { return null; }
+  }
 
-    if (!name) return setErr("Enter an icon name.");
+  // ---- Paste a single icon (from Illustrator) into the upload batch ----
+  async function addPastedIcon() {
+    const raw = pasteIconSvg.value.trim();
+    const setStatus = (cls, msg) => { pasteIconStatus.className = "svg-paste-status " + cls; pasteIconStatus.textContent = msg; };
+    const setErr = msg => setStatus("svg-paste-error", msg);
+
     if (!raw) return setErr("Paste the icon first.");
     if (hasActiveFill(raw)) return setErr("This icon has outlined strokes or fills — icons must be stroke-based.");
     const cleaned = prepPastedSvg(raw);
     if (!cleaned) return setErr("That doesn't look like a valid icon.");
+
+    // Use the typed name, or auto-name it (like sheets do) when left blank
+    let name = pasteIconName.value.trim();
+    if (!name) {
+      setStatus("", "Naming…");
+      pasteIconAdd.disabled = true;
+      name = await autoNameSvg(cleaned);
+      pasteIconAdd.disabled = false;
+      if (!name) name = "icon";
+    }
 
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     uploadedIcons.push({ id, name: name.charAt(0).toUpperCase() + name.slice(1), svg: cleaned });
 
     pasteIconName.value = "";
     pasteIconSvg.value = "";
-    pasteIconStatus.className = "svg-paste-status svg-paste-ok";
-    pasteIconStatus.textContent = `Added "${name}" — Upload to Library when ready.`;
+    setStatus("svg-paste-ok", `Added "${name}" — Upload to Library when ready.`);
     refreshUploadPreview();
   }
   pasteIconAdd.addEventListener("click", addPastedIcon);
