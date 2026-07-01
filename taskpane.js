@@ -73,6 +73,8 @@ Office.onReady(async ({ host }) => {
   const uploadClients        = document.getElementById("upload-clients");
   const uploadStatus         = document.getElementById("upload-status");
   const pasteIconSvg         = document.getElementById("paste-icon-svg");
+  const pasteIconPreview     = document.getElementById("paste-icon-preview");
+  const pasteClearBtn        = document.getElementById("paste-clear");
   const pasteIconAdd         = document.getElementById("paste-icon-add");
   const pasteIconStatus      = document.getElementById("paste-icon-status");
   const selectModeBtn        = document.getElementById("select-mode-btn");
@@ -87,6 +89,7 @@ Office.onReady(async ({ host }) => {
   let selectedIds    = new Set();    // icon.id strings currently selected
   let lastVisibleIcons = [];         // icons rendered in the current view
   let sheetQueue     = [];           // multi-icon sheets awaiting split + review
+  let pastePendingSvg = null;        // validated SVG pasted in the upload modal
   let allIcons       = [];
   let activeClient   = "All";
   let activeQuery    = "";
@@ -2142,8 +2145,7 @@ Office.onReady(async ({ host }) => {
     uploadedIcons = [];
     previewSection.classList.add("hidden");
     uploadStatus.classList.add("hidden");
-    pasteIconSvg.value = "";
-    pasteIconStatus.className = "svg-paste-status hidden";
+    resetPasteBox();
 
     // Load clients and render group chips fresh
     await fetchClients();
@@ -2341,16 +2343,51 @@ Office.onReady(async ({ host }) => {
     } catch { return null; }
   }
 
-  // ---- Paste a single icon (from Illustrator) → auto-name → add to library ----
-  async function addPastedIcon() {
+  const setPasteStatus = (cls, msg) => { pasteIconStatus.className = "svg-paste-status " + cls; pasteIconStatus.textContent = msg; };
+
+  // Show the rendered icon (hiding the code) or return to the paste box
+  function showPastePreview(svg) {
+    if (svg) {
+      pasteIconPreview.innerHTML = normalizeSvgDisplay(svg);
+      pasteIconPreview.classList.remove("hidden");
+      pasteIconSvg.classList.add("hidden");
+      pasteClearBtn.classList.remove("hidden");
+    } else {
+      pasteIconPreview.innerHTML = "";
+      pasteIconPreview.classList.add("hidden");
+      pasteIconSvg.classList.remove("hidden");
+      pasteClearBtn.classList.add("hidden");
+    }
+  }
+
+  function resetPasteBox() {
+    pasteIconSvg.value = "";
+    pastePendingSvg = null;
+    showPastePreview(null);
+    pasteIconStatus.className = "svg-paste-status hidden";
+  }
+
+  // As soon as something is pasted, validate and show the icon (not the code)
+  pasteIconSvg.addEventListener("input", () => {
     const raw = pasteIconSvg.value.trim();
-    const setStatus = (cls, msg) => { pasteIconStatus.className = "svg-paste-status " + cls; pasteIconStatus.textContent = msg; };
+    if (!raw) { pastePendingSvg = null; showPastePreview(null); pasteIconStatus.className = "svg-paste-status hidden"; return; }
+    if (hasActiveFill(raw)) { pastePendingSvg = null; showPastePreview(null); setPasteStatus("svg-paste-error", "This icon has outlined strokes or fills — icons must be stroke-based."); return; }
+    const cleaned = prepPastedSvg(raw);
+    if (!cleaned) { pastePendingSvg = null; showPastePreview(null); setPasteStatus("svg-paste-error", "That doesn't look like a valid icon."); return; }
+    pastePendingSvg = cleaned;
+    showPastePreview(cleaned);
+    pasteIconStatus.className = "svg-paste-status hidden";
+  });
+
+  pasteClearBtn.addEventListener("click", () => { resetPasteBox(); pasteIconSvg.focus(); });
+
+  // ---- Add the pasted icon → auto-name → add to library ----
+  async function addPastedIcon() {
+    const setStatus = setPasteStatus;
     const setErr = msg => setStatus("svg-paste-error", msg);
 
-    if (!raw) return setErr("Paste the icon first.");
-    if (hasActiveFill(raw)) return setErr("This icon has outlined strokes or fills — icons must be stroke-based.");
-    const cleaned = prepPastedSvg(raw);
-    if (!cleaned) return setErr("That doesn't look like a valid icon.");
+    const cleaned = pastePendingSvg;
+    if (!cleaned) return setErr("Paste an icon first.");
 
     pasteIconAdd.disabled = true;
     try {
@@ -2379,7 +2416,7 @@ Office.onReady(async ({ host }) => {
       }
 
       await loadIcons(token);
-      pasteIconSvg.value = "";
+      resetPasteBox();
       setStatus("svg-paste-ok", `Added "${name}" to the library.`);
       showToast(`"${name}" added`);
     } catch (err) {
