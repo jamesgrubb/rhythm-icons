@@ -736,7 +736,7 @@ Office.onReady(async ({ host }) => {
       pendingSvg = cleaned;
       showPreview(cleaned);
       svgStatus.className = "svg-paste-status svg-paste-ok";
-      svgStatus.textContent = "New artwork loaded — replaces on Save. Name, ID & tags stay the same.";
+      svgStatus.textContent = "New artwork loaded — replaces on Save.";
     };
     svgInput.addEventListener("input", onSvgInput);
 
