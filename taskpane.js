@@ -2854,9 +2854,6 @@ Office.onReady(async ({ host }) => {
       const item = document.createElement("div");
       item.className = "ss-review-item" + (ok ? "" : " ss-review-blocked");
       item.innerHTML = `
-        <label class="ss-review-check">
-          <input type="checkbox" data-idx="${idx}" ${ok ? "checked" : "disabled"} />
-        </label>
         <div class="ss-review-preview">${cand.svg}</div>
         <div class="ss-review-fields">
           <input type="text" class="confirm-input ss-review-name" data-idx="${idx}" value="${cand.name.replace(/"/g, "&quot;")}" ${ok ? "" : "disabled"} />
@@ -2874,9 +2871,13 @@ Office.onReady(async ({ host }) => {
   }
 
   async function ssApproveSelected() {
-    const checks = ssReviewGrid.querySelectorAll('input[type="checkbox"]:checked');
-    if (checks.length === 0) {
-      showToast("Nothing selected");
+    // Add every stroke-valid candidate (the green "Stroke ✓" badge is the signal);
+    // outlined/mixed ones are skipped.
+    const validIdx = ssCandidates
+      .map((c, i) => (c.stroke_status === "valid" ? i : -1))
+      .filter(i => i >= 0);
+    if (validIdx.length === 0) {
+      showToast("No stroke-based icons to add");
       return;
     }
 
@@ -2888,8 +2889,7 @@ Office.onReady(async ({ host }) => {
     try {
       const token = await getAccessToken();
 
-      for (const check of checks) {
-        const idx = Number(check.dataset.idx);
+      for (const idx of validIdx) {
         const cand = ssCandidates[idx];
         const nameInput = ssReviewGrid.querySelector(`.ss-review-name[data-idx="${idx}"]`);
         const name = (nameInput?.value || cand.name).trim();
