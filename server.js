@@ -965,6 +965,32 @@ app.post("/api/icons/name-svg", requireAuth, ensureTenantExists, extractUserRole
   }
 });
 
+// POST /api/icons/phash-check — for each svg, the nearest visually-identical
+// icon already in the library (perceptual hash), or null. Admin only.
+app.post("/api/icons/phash-check", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { svgs } = req.body;
+  if (!Array.isArray(svgs)) return res.status(400).json({ error: "Provide svgs[]" });
+  try {
+    const { computePhash, hamming, DUP_THRESHOLD } = require("./lib/phash");
+    const rows = await pool.query(
+      "SELECT icon_id AS id, name, phash FROM icons WHERE (tenant_id = $1 OR is_public = true) AND phash IS NOT NULL",
+      [req.user.tenantId]
+    );
+    const existing = rows.rows;
+    const matches = svgs.map((svg) => {
+      const ph = computePhash(svg);
+      if (!ph) return null;
+      let best = null, bestD = Infinity;
+      for (const row of existing) { const d = hamming(ph, row.phash); if (d < bestD) { bestD = d; best = row; } }
+      return (best && bestD <= DUP_THRESHOLD) ? { id: best.id, name: best.name, distance: bestD } : null;
+    });
+    res.json({ matches });
+  } catch (error) {
+    console.error("[API] phash-check error:", error.message);
+    res.status(500).json({ error: "Failed to check duplicates" });
+  }
+});
+
 // POST /api/icons/normalize-svg — normalize a single icon to 0 0 24 24 (admin),
 // no naming. Used by the edit "replace artwork" paste.
 app.post("/api/icons/normalize-svg", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {

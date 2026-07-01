@@ -2569,6 +2569,42 @@ Office.onReady(async ({ host }) => {
     let updatedCount = 0;
     let skippedCount = 0;
 
+    // Visual duplicate pre-check (icons matching existing artwork under a
+    // different name — name duplicates are still handled per-icon below).
+    try {
+      const chk = await fetch(`${ICON_API_BASE}/icons/phash-check`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ svgs: uploadedIcons.map(i => i.svg) })
+      });
+      if (chk.ok) {
+        const { matches } = await chk.json();
+        const visualDups = [];
+        (matches || []).forEach((m, i) => {
+          if (m && !uploadedIcons[i]._isDuplicate) { uploadedIcons[i]._phashDup = m; visualDups.push(uploadedIcons[i]); }
+        });
+        if (visualDups.length) {
+          const names = visualDups.map(d => `"${d.name}" (matches "${d._phashDup.name}")`).slice(0, 8).join(", ") + (visualDups.length > 8 ? "…" : "");
+          const addAnyway = await customConfirm(
+            `${visualDups.length} of these already exist as artwork: ${names}. Add them anyway? (Cancel skips them.)`,
+            "Duplicates found",
+            { confirmLabel: "Add anyway", danger: false }
+          );
+          if (!addAnyway) {
+            uploadedIcons = uploadedIcons.filter(i => !i._phashDup);
+            skippedCount += visualDups.length;
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (uploadedIcons.length === 0) {
+      showToast("All skipped as duplicates");
+      copyCodeBtn.disabled = false;
+      copyCodeBtn.textContent = "Upload to Library";
+      return;
+    }
+
     try {
       // Process each icon
       for (const icon of uploadedIcons) {
@@ -2978,22 +3014,38 @@ Office.onReady(async ({ host }) => {
         const iconId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
         const tagsInput = ssReviewGrid.querySelector(`.ss-review-tags[data-idx="${idx}"]`);
         const tags = (tagsInput?.value || "").split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
-        return { name, iconId, tags, svg: cand.svg, isDup: existingIds.has(iconId) };
+        return { name, iconId, tags, svg: cand.svg, nameDup: existingIds.has(iconId), phashDup: null };
       });
 
-      // Duplicates already in the library → ask whether to replace or skip
-      const dups = items.filter(x => x.isDup);
-      let replaceDups = true;
+      // Sheets: also flag visually-identical icons (perceptual hash). The paste
+      // flow already warns earlier, so only check when this came from a sheet.
+      if (ssReviewJobId) {
+        try {
+          const chk = await fetch(`${ICON_API_BASE}/icons/phash-check`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ svgs: items.map(x => x.svg) })
+          });
+          if (chk.ok) {
+            const { matches } = await chk.json();
+            (matches || []).forEach((m, i) => { if (m && !items[i].nameDup) items[i].phashDup = m; });
+          }
+        } catch (_) {}
+      }
+
+      // Duplicates (by name or artwork) → ask whether to add anyway or skip
+      const dups = items.filter(x => x.nameDup || x.phashDup);
+      let addDups = true;
       if (dups.length) {
-        const names = dups.map(d => `"${d.name}"`).slice(0, 8).join(", ") + (dups.length > 8 ? "…" : "");
-        replaceDups = await customConfirm(
-          `${dups.length} icon${dups.length > 1 ? "s" : ""} already exist${dups.length > 1 ? "" : "s"} in the library: ${names}. Replace the existing artwork? (Cancel skips ${dups.length > 1 ? "them" : "it"} and adds only the new icons.)`,
-          "Duplicate icons",
-          { confirmLabel: "Replace", danger: false }
+        const names = dups.map(d => d.phashDup ? `"${d.name}" (matches "${d.phashDup.name}")` : `"${d.name}"`).slice(0, 8).join(", ") + (dups.length > 8 ? "…" : "");
+        addDups = await customConfirm(
+          `${dups.length} of these already exist in the library: ${names}. Add them anyway? (Same-name icons are replaced. Cancel skips the duplicates and adds only the new icons.)`,
+          "Duplicates found",
+          { confirmLabel: "Add anyway", danger: false }
         );
       }
 
-      const toUpload = replaceDups ? items : items.filter(x => !x.isDup);
+      const toUpload = addDups ? items : items.filter(x => !x.nameDup && !x.phashDup);
       skipped = items.length - toUpload.length;
 
       for (const it of toUpload) {
