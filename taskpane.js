@@ -2413,7 +2413,8 @@ Office.onReady(async ({ host }) => {
     pastePendingSvg = null;
     showPastePreview(null);
     pasteIconStatus.className = "svg-paste-status hidden";
-    pasteIconAdd.disabled = true; // nothing to review yet
+    pasteIconAdd.classList.add("hidden"); // nothing to review yet
+    pasteIconAdd.disabled = false;
   }
 
   // As soon as something is pasted, validate and show the icon (never the code)
@@ -2427,7 +2428,7 @@ Office.onReady(async ({ host }) => {
 
     const showErr = msg => {
       pastePendingSvg = null;
-      pasteIconAdd.disabled = true;
+      pasteIconAdd.classList.add("hidden");
       pasteIconPreview.classList.add("hidden");
       setPasteStatus("svg-paste-error", msg);
     };
@@ -2436,7 +2437,7 @@ Office.onReady(async ({ host }) => {
     if (!cleaned) return showErr("That doesn't look like a valid icon.");
 
     pastePendingSvg = cleaned;
-    pasteIconAdd.disabled = false; // accepted icon ready to review
+    pasteIconAdd.classList.remove("hidden"); // accepted icon → show the button
     pasteIconPreview.innerHTML = normalizeSvgDisplay(cleaned);
     pasteIconPreview.classList.remove("hidden");
     pasteIconStatus.className = "svg-paste-status hidden";
@@ -2463,8 +2464,8 @@ Office.onReady(async ({ host }) => {
     } catch (err) {
       setStatus("svg-paste-error", `Couldn't prepare: ${err.message}`);
     } finally {
-      // Re-enable only if there's still a pending icon (resetPasteBox clears it)
-      pasteIconAdd.disabled = !pastePendingSvg;
+      // resetPasteBox hides it on success; on error it stays visible to retry
+      pasteIconAdd.disabled = false;
     }
   }
   pasteIconAdd.addEventListener("click", addPastedIcon);
