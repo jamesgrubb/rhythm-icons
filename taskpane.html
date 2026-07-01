@@ -257,7 +257,7 @@
       <div id="upload-modal" class="modal hidden">
         <div class="modal-content">
           <div class="modal-header">
-            <h2>Bulk Upload SVG Icons</h2>
+            <h2>Upload Icons</h2>
             <button id="close-upload" class="btn-ghost">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -274,9 +274,18 @@
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                   <p><strong>Click to select</strong> or drag SVG files here</p>
-                  <p class="upload-hint">Select multiple .svg files</p>
+                  <p class="upload-hint">SVG only — select one or more .svg files</p>
                 </div>
               </label>
+
+              <div class="paste-icon-block">
+                <div class="paste-divider"><span>or paste an icon</span></div>
+                <p class="replace-hint">Copy icon from Adobe Illustrator and paste here</p>
+                <input type="text" id="paste-icon-name" class="confirm-input" placeholder="Icon name" />
+                <textarea id="paste-icon-svg" class="confirm-input svg-paste-input" rows="3" placeholder="Paste here"></textarea>
+                <div id="paste-icon-status" class="svg-paste-status hidden"></div>
+                <button type="button" id="paste-icon-add" class="btn-secondary">Add icon</button>
+              </div>
 
               <div class="form-group">
                 <label>Groups <span class="form-hint">(tap to assign — applies to all uploaded)</span></label>
@@ -284,10 +293,10 @@
               </div>
 
               <div class="upload-requirements">
-                <div class="requirements-title">Requirements:</div>
+                <div class="requirements-title">Recommendations:</div>
                 <ul>
-                  <li>No fill attributes (stroke-based only)</li>
-                  <li>Recommended: stroke-width 2px</li>
+                  <li>Stroke-based icons (no outlined strokes or fills)</li>
+                  <li>Stroke-width 2px</li>
                 </ul>
               </div>
             </div>

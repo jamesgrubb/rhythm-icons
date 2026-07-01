@@ -72,6 +72,10 @@ Office.onReady(async ({ host }) => {
   const addClientBtn         = document.getElementById("add-client-btn");
   const uploadClients        = document.getElementById("upload-clients");
   const uploadStatus         = document.getElementById("upload-status");
+  const pasteIconName        = document.getElementById("paste-icon-name");
+  const pasteIconSvg         = document.getElementById("paste-icon-svg");
+  const pasteIconAdd         = document.getElementById("paste-icon-add");
+  const pasteIconStatus      = document.getElementById("paste-icon-status");
   const selectModeBtn        = document.getElementById("select-mode-btn");
   const selectionBar         = document.getElementById("selection-bar");
   const selectAllBtn         = document.getElementById("select-all-btn");
@@ -645,6 +649,17 @@ Office.onReady(async ({ host }) => {
     }
   }
 
+  // True if the SVG paints with an actual fill colour (i.e. outlined strokes /
+  // filled artwork) rather than being purely stroke-based. Checks attributes,
+  // inline styles, and <style> blocks; fill:none / fill="none" don't count.
+  function hasActiveFill(svg) {
+    const matches = [
+      ...((svg || "").match(/fill\s*=\s*["'][^"']*["']/gi) || []),
+      ...((svg || "").match(/fill\s*:\s*[^;"'}\s]+/gi) || [])
+    ];
+    return matches.some(m => !/none/i.test(m));
+  }
+
   // Clean a pasted SVG (e.g. from Illustrator) for the library: strip XML
   // declaration/doctype, ensure xmlns + viewBox, and keep it stroke-based
   // (active fills → none). Returns null if the text isn't a valid SVG.
@@ -728,11 +743,18 @@ Office.onReady(async ({ host }) => {
         showPreview(icon.svg);
         return;
       }
+      if (hasActiveFill(raw)) {
+        pendingSvg = null;
+        svgStatus.className = "svg-paste-status svg-paste-error";
+        svgStatus.textContent = "This icon has outlined strokes or fills — icons must be stroke-based.";
+        showPreview(icon.svg);
+        return;
+      }
       const cleaned = prepPastedSvg(raw);
       if (!cleaned) {
         pendingSvg = null;
         svgStatus.className = "svg-paste-status svg-paste-error";
-        svgStatus.textContent = "That doesn't look like valid SVG code.";
+        svgStatus.textContent = "That doesn't look like a valid icon.";
         showPreview(icon.svg);
         return;
       }
@@ -2115,9 +2137,17 @@ Office.onReady(async ({ host }) => {
     return duplicates;
   }
 
-  // ---- Bulk Upload ----
+  // ---- Upload Icons ----
   uploadBtn.addEventListener("click", async () => {
-    // Load clients when opening upload modal, render group chips fresh
+    // Fresh batch each time the modal opens
+    uploadedIcons = [];
+    previewSection.classList.add("hidden");
+    uploadStatus.classList.add("hidden");
+    pasteIconName.value = "";
+    pasteIconSvg.value = "";
+    pasteIconStatus.className = "svg-paste-status hidden";
+
+    // Load clients and render group chips fresh
     await fetchClients();
     renderGroupChips(uploadClients, [], { includeUnassigned: true });
     uploadModal.classList.remove("hidden");
@@ -2200,192 +2230,126 @@ Office.onReady(async ({ host }) => {
     }
   }
 
+  // Re-run duplicate detection and refresh the preview grid for the batch.
+  function refreshUploadPreview() {
+    if (uploadedIcons.length === 0) {
+      previewSection.classList.add("hidden");
+      return;
+    }
+    uploadedIcons.forEach(i => { i._isDuplicate = false; i._duplicateInfo = null; });
+    findDuplicates(uploadedIcons, allIcons).forEach(dup => {
+      dup.uploaded._isDuplicate = true;
+      dup.uploaded._duplicateInfo = dup;
+    });
+    renderPreview();
+    previewSection.classList.remove("hidden");
+  }
+
+  // Clear, categorized alert about files that couldn't be added.
+  async function alertUploadFailures(failed) {
+    const list = r => failed.filter(f => f.reason === r).map(f => `• ${f.file}`);
+    const eps = list("eps"), notSvg = list("not-svg"), outlined = list("outlined");
+    const other = failed.filter(f => !["eps", "not-svg", "outlined"].includes(f.reason)).map(f => `• ${f.file}`);
+    const parts = [];
+    if (eps.length) parts.push(`EPS files aren't supported — please upload SVG:\n${eps.join("\n")}`);
+    if (notSvg.length) parts.push(`Only SVG files can be uploaded:\n${notSvg.join("\n")}`);
+    if (outlined.length) parts.push(`These have outlined strokes or fills — icons must be stroke-based:\n${outlined.join("\n")}`);
+    if (other.length) parts.push(`Couldn't read:\n${other.join("\n")}`);
+    await customAlert(parts.join("\n\n"), "Some icons weren't added");
+  }
+
   svgFileInput.addEventListener("change", async (e) => {
     const files = Array.from(e.target.files);
-    console.log("[Upload] Selected", files.length, "files");
-
     if (files.length === 0) return;
 
-    uploadedIcons = [];
-    const failedFiles = []; // Track validation failures
-    const sheetFiles = [];  // Multi-icon sheets routed to the splitter
+    const failedFiles = []; // { file, reason }
+    const sheetFiles = [];  // multi-icon sheets → splitter
 
     for (const file of files) {
-      console.log("[Upload] Processing:", file.name, "Type:", file.type, "Size:", file.size);
-
-      if (!file.name.endsWith('.svg')) {
-        console.log("[Upload] Skipping non-SVG file:", file.name);
-        failedFiles.push({ file: file.name, reason: "Not an SVG file" });
-        continue;
-      }
+      const lower = file.name.toLowerCase();
+      if (lower.endsWith(".eps")) { failedFiles.push({ file: file.name, reason: "eps" }); continue; }
+      if (!lower.endsWith(".svg")) { failedFiles.push({ file: file.name, reason: "not-svg" }); continue; }
 
       try {
-        let svgContent = await file.text();
-        console.log("[Upload] Read file content, length:", svgContent.length);
+        let svg = (await file.text()).trim()
+          .replace(/<\?xml[^>]*\?>/g, "")
+          .replace(/<!DOCTYPE[^>]*>/g, "")
+          .trim();
 
-        // Auto-detect a multi-icon sheet and route it to the splitter pipeline
-        // instead of importing the whole sheet as a single icon.
-        if (isSheetSvg(svgContent)) {
-          console.log(`[Upload] "${file.name}" looks like a sheet — routing to splitter`);
-          sheetFiles.push(file);
-          continue;
+        // Multi-icon sheet → segmentation pipeline
+        if (isSheetSvg(svg)) { sheetFiles.push(file); continue; }
+
+        // Name + ID from filename (strip version suffix from the display name)
+        const base = file.name.replace(/\.svg$/i, "");
+        const iconName = base.replace(/[-_]/g, " ").replace(/\s+v\d+$/i, "");
+        const iconId = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+        // Ensure viewBox + xmlns
+        if (!/viewBox\s*=/i.test(svg)) {
+          const w = (svg.match(/width=["']([\d.]+)/i) || [])[1] || 24;
+          const h = (svg.match(/height=["']([\d.]+)/i) || [])[1] || 24;
+          svg = svg.replace(/<svg/i, `<svg viewBox="0 0 ${w} ${h}"`);
         }
+        if (!/xmlns\s*=/i.test(svg)) svg = svg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
 
-        // Extract icon name and ID from filename
-        let iconName = file.name.replace('.svg', '').replace(/[-_]/g, ' ');
-        const iconId = file.name.replace('.svg', '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        // Reject outlined-stroke / filled icons — the library is stroke-based
+        if (hasActiveFill(svg)) { failedFiles.push({ file: file.name, reason: "outlined" }); continue; }
 
-        // Auto-strip version suffixes from display name (v2, v3, etc.)
-        // Keep them in the ID for duplicate detection, but not in the display name
-        iconName = iconName.replace(/\s+v\d+$/i, '');
-        console.log(`[Upload] Filename: "${file.name}" → Name: "${iconName}" (version suffix stripped)`);
-
-        // Clean up SVG content
-        svgContent = svgContent.trim();
-
-        // Remove XML declaration and DOCTYPE if present
-        svgContent = svgContent.replace(/<\?xml[^>]*\?>/g, '');
-        svgContent = svgContent.replace(/<!DOCTYPE[^>]*>/g, '');
-        svgContent = svgContent.trim();
-
-        console.log("[Upload] After cleanup, length:", svgContent.length);
-        console.log("[Upload] First 200 chars:", svgContent.substring(0, 200));
-
-        // Extract existing viewBox or width/height to determine icon bounds
-        const viewBoxMatch = svgContent.match(/viewBox=["']([^"']+)["']/);
-        const widthMatch = svgContent.match(/width=["']([^"']+)["']/);
-        const heightMatch = svgContent.match(/height=["']([^"']+)["']/);
-
-        if (!viewBoxMatch && (widthMatch || heightMatch)) {
-          // Has width/height but no viewBox - create one
-          const width = widthMatch ? parseFloat(widthMatch[1]) : 24;
-          const height = heightMatch ? parseFloat(heightMatch[1]) : 24;
-          console.log(`[Upload] Creating viewBox from width=${width}, height=${height}`);
-          svgContent = svgContent.replace('<svg', `<svg viewBox="0 0 ${width} ${height}"`);
-        } else if (!viewBoxMatch) {
-          // No viewBox or dimensions - use default
-          console.log("[Upload] Adding default viewBox 0 0 24 24");
-          svgContent = svgContent.replace('<svg', '<svg viewBox="0 0 24 24"');
-        }
-
-        // Ensure xmlns is present
-        if (!svgContent.includes('xmlns=')) {
-          console.log("[Upload] Adding xmlns attribute");
-          svgContent = svgContent.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-        }
-
-        // STRICT VALIDATION - REJECT FILES THAT DON'T MEET STANDARDS
-        const finalViewBoxMatch = svgContent.match(/viewBox=["']([^"']+)["']/);
-        const strokeWidthMatch = svgContent.match(/stroke-width[:\s=]["']?([\d.]+)/);
-        const hasStroke = svgContent.includes('stroke:') || svgContent.includes('stroke=');
-
-        // viewBox just needs to exist (any dimensions — sheet exports vary).
-        // One is auto-added above if the source had none, so this is a safety net.
-        if (!finalViewBoxMatch) {
-          console.error(`[Upload] ✗ "${iconName}": Missing viewBox`);
-          failedFiles.push({ file: file.name, reason: "Missing viewBox attribute" });
-          continue;
-        }
-
-        // Keep icons stroke-based: strip any active fill (attribute or inline
-        // style) to "none" instead of rejecting. Sheet/converted exports often
-        // carry stray fills; the preview shows how each icon will actually render.
-        svgContent = svgContent
-          .replace(/fill\s*=\s*["'][^"']*["']/gi, (m) => /none/i.test(m) ? m : 'fill="none"')
-          .replace(/fill\s*:\s*[^;"'}\s]+/gi, (m) => /none/i.test(m) ? m : 'fill:none');
-
-        // Passed all validations
-        console.log(`[Upload] ✓ "${iconName}": Passed all validations`);
-
-        // Auto-fix missing stroke-width
-        if (hasStroke && !strokeWidthMatch) {
-          console.warn(`[Upload] ⚠️  "${iconName}": Missing stroke-width, adding default 2px`);
-
-          // Add stroke-width to style blocks
-          svgContent = svgContent.replace(/(<style[\s\S]*?)(stroke-linecap|stroke-linejoin|stroke:)/g,
-            (match, before, prop) => `${before}stroke-width: 2;\n            ${prop}`);
-
-          console.log(`[Upload] ✓ "${iconName}": Auto-added stroke-width: 2px`);
-        } else if (strokeWidthMatch) {
-          const strokeWidth = parseFloat(strokeWidthMatch[1]);
-          const isStandardStroke = strokeWidth >= 1.5 && strokeWidth <= 2.5;
-
-          if (!isStandardStroke) {
-            console.warn(`[Upload] ⚠️  "${iconName}": Non-standard stroke-width ${strokeWidth}px (expected 2px)`);
-          } else {
-            console.log(`[Upload] ✓ "${iconName}": Standard stroke-width ${strokeWidth}px`);
-          }
-        }
+        // Normalize stroke colour to our default (currentColor)
+        svg = svg
+          .replace(/stroke\s*=\s*["'][^"']*["']/gi, m => /none/i.test(m) ? m : 'stroke="currentColor"')
+          .replace(/stroke\s*:\s*[^;"'}\s]+/gi, m => /none/i.test(m) ? m : 'stroke:currentColor');
 
         uploadedIcons.push({
           id: iconId,
           name: iconName.charAt(0).toUpperCase() + iconName.slice(1),
-          svg: svgContent
+          svg
         });
-
-        console.log("[Upload] ✓ Added icon:", iconName);
       } catch (err) {
-        console.error("[Upload] ✗ Error reading file:", file.name, err);
-        failedFiles.push({ file: file.name, reason: err.message || "Error reading file" });
+        failedFiles.push({ file: file.name, reason: "read-error" });
       }
     }
 
-    console.log("[Upload] Total icons imported:", uploadedIcons.length);
-    console.log("[Upload] Failed files:", failedFiles.length);
+    if (failedFiles.length > 0) await alertUploadFailures(failedFiles);
 
-    // Show validation summary
-    if (failedFiles.length > 0) {
-      console.warn("[Upload] Failed files:", failedFiles);
-      const failedList = failedFiles.map(f => `• ${f.file}: ${f.reason}`).join('\n');
-      await customAlert(
-        `${failedFiles.length} file(s) failed validation:\n\n${failedList}\n\nRequired:\n✓ No fill attributes (stroke-based only)`,
-        'Validation Failed'
-      );
-    }
-
-    if (uploadedIcons.length > 0) {
-      // Check for duplicates
-      console.log("[Upload] Checking for duplicates. allIcons count:", allIcons.length);
-      console.log("[Upload] uploadedIcons:", uploadedIcons.map(i => ({ id: i.id, name: i.name })));
-      console.log("[Upload] Sample existing icons:", allIcons.slice(0, 5).map(i => ({ id: i.id, name: i.name })));
-
-      const duplicates = findDuplicates(uploadedIcons, allIcons);
-
-      if (duplicates.length > 0) {
-        console.log(`[Upload] Found ${duplicates.length} duplicate(s):`, duplicates);
-
-        // Add visual indicator to preview grid
-        duplicates.forEach(dup => {
-          const uploadedIcon = dup.uploaded;
-          // Mark icon as duplicate in uploadedIcons array
-          uploadedIcon._isDuplicate = true;
-          uploadedIcon._duplicateInfo = dup;
-        });
-      }
-
-      console.log("[Upload] Calling renderPreview()...");
-      renderPreview();
-      console.log("[Upload] Showing preview section...");
-      previewSection.classList.remove("hidden");
-
-      if (failedFiles.length > 0) {
-        showToast(`${uploadedIcons.length} passed, ${failedFiles.length} failed validation`);
-      }
-    } else if (sheetFiles.length === 0) {
-      console.log("[Upload] No valid SVG files found");
-      showToast("No valid SVG files - check requirements");
-    }
-
-    // Sheets: split + name + review, one sheet at a time
+    // Sheets: split + name + review, one at a time
     if (sheetFiles.length > 0) {
-      console.log(`[Upload] ${sheetFiles.length} sheet(s) routed to splitter`);
       sheetQueue = sheetFiles.slice();
       processNextSheet();
+    }
+
+    refreshUploadPreview();
+
+    if (uploadedIcons.length === 0 && sheetFiles.length === 0 && failedFiles.length === 0) {
+      showToast("No valid SVG files");
     }
 
     // Allow re-selecting the same file(s) again
     e.target.value = "";
   });
+
+  // ---- Paste a single icon (from Illustrator) into the upload batch ----
+  function addPastedIcon() {
+    const name = pasteIconName.value.trim();
+    const raw = pasteIconSvg.value.trim();
+    const setErr = msg => { pasteIconStatus.className = "svg-paste-status svg-paste-error"; pasteIconStatus.textContent = msg; };
+
+    if (!name) return setErr("Enter an icon name.");
+    if (!raw) return setErr("Paste the icon first.");
+    if (hasActiveFill(raw)) return setErr("This icon has outlined strokes or fills — icons must be stroke-based.");
+    const cleaned = prepPastedSvg(raw);
+    if (!cleaned) return setErr("That doesn't look like a valid icon.");
+
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    uploadedIcons.push({ id, name: name.charAt(0).toUpperCase() + name.slice(1), svg: cleaned });
+
+    pasteIconName.value = "";
+    pasteIconSvg.value = "";
+    pasteIconStatus.className = "svg-paste-status svg-paste-ok";
+    pasteIconStatus.textContent = `Added "${name}" — Upload to Library when ready.`;
+    refreshUploadPreview();
+  }
+  pasteIconAdd.addEventListener("click", addPastedIcon);
 
   function renderPreview() {
     previewGrid.innerHTML = "";
