@@ -855,12 +855,8 @@ Office.onReady(async ({ host }) => {
 
   // ---- Insert icon into document ----
   async function insertIcon(icon, cardEl) {
-    // Block insertions for viewers
-    if (currentUserRole === 'viewer') {
-      showToast('Viewer role cannot insert icons');
-      return;
-    }
-
+    // All signed-in roles (admin, user, viewer) may insert icons; only library
+    // management (upload/edit/delete) is admin-only.
     console.log("[Insert] Starting insertion for:", icon.name);
     updateDebugStatus(`Inserting ${icon.name}...`);
     cardEl.classList.add("inserting");
