@@ -664,8 +664,13 @@ Office.onReady(async ({ host }) => {
       svg = svg.replace(/<svg/i, `<svg viewBox="0 0 ${w} ${h}"`);
     }
     svg = svg
+      // Keep stroke-based: strip active fills to none
       .replace(/fill\s*=\s*["'][^"']*["']/gi, m => /none/i.test(m) ? m : 'fill="none"')
-      .replace(/fill\s*:\s*[^;"'}\s]+/gi, m => /none/i.test(m) ? m : 'fill:none');
+      .replace(/fill\s*:\s*[^;"'}\s]+/gi, m => /none/i.test(m) ? m : 'fill:none')
+      // Normalize stroke colour to our default (currentColor) — attributes AND
+      // <style> blocks. Leaves stroke-width/linecap/etc. and stroke="none" alone.
+      .replace(/stroke\s*=\s*["'][^"']*["']/gi, m => /none/i.test(m) ? m : 'stroke="currentColor"')
+      .replace(/stroke\s*:\s*[^;"'}\s]+/gi, m => /none/i.test(m) ? m : 'stroke:currentColor');
     return svg;
   }
 
