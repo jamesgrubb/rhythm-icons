@@ -2948,34 +2948,46 @@ Office.onReady(async ({ host }) => {
     ssReviewApprove.disabled = true;
     ssReviewApprove.textContent = "Adding…";
     const clientIds = getSelectedGroupIds(ssReviewClients);
-    let added = 0, failed = 0;
+    let added = 0, failed = 0, skipped = 0;
 
     try {
       const token = await getAccessToken();
 
-      for (const idx of validIdx) {
+      // Build upload items (with edited names/tags) and flag duplicates by id
+      const existingIds = new Set(allIcons.map(i => String(i.id)));
+      const items = validIdx.map(idx => {
         const cand = ssCandidates[idx];
         const nameInput = ssReviewGrid.querySelector(`.ss-review-name[data-idx="${idx}"]`);
         const name = (nameInput?.value || cand.name).trim();
         const iconId = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
         const tagsInput = ssReviewGrid.querySelector(`.ss-review-tags[data-idx="${idx}"]`);
-        const tags = (tagsInput?.value || "")
-          .split(",")
-          .map(t => t.trim().toLowerCase())
-          .filter(Boolean);
+        const tags = (tagsInput?.value || "").split(",").map(t => t.trim().toLowerCase()).filter(Boolean);
+        return { name, iconId, tags, svg: cand.svg, isDup: existingIds.has(iconId) };
+      });
 
+      // Duplicates already in the library → ask whether to replace or skip
+      const dups = items.filter(x => x.isDup);
+      let replaceDups = true;
+      if (dups.length) {
+        const names = dups.map(d => `"${d.name}"`).slice(0, 8).join(", ") + (dups.length > 8 ? "…" : "");
+        replaceDups = await customConfirm(
+          `${dups.length} icon${dups.length > 1 ? "s" : ""} already exist${dups.length > 1 ? "" : "s"} in the library: ${names}. Replace the existing artwork? (Cancel skips ${dups.length > 1 ? "them" : "it"} and adds only the new icons.)`,
+          "Duplicate icons",
+          { confirmLabel: "Replace", danger: false }
+        );
+      }
+
+      const toUpload = replaceDups ? items : items.filter(x => !x.isDup);
+      skipped = items.length - toUpload.length;
+
+      for (const it of toUpload) {
         const res = await fetch(`${ICON_API_BASE}/icons`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ id: iconId, name, svg: cand.svg, category: "Uncategorized", client_ids: clientIds, tags })
+          body: JSON.stringify({ id: it.iconId, name: it.name, svg: it.svg, category: "Uncategorized", client_ids: clientIds, tags: it.tags })
         });
-
-        if (res.ok) {
-          added++;
-        } else {
-          failed++;
-          console.error(`[Shutterstock] Failed to add "${name}":`, await res.text());
-        }
+        if (res.ok) added++;
+        else { failed++; console.error(`[Review] Failed to add "${it.name}":`, await res.text()); }
       }
 
       // Mark the source job done (pasted single icons have no job)
@@ -2989,7 +3001,7 @@ Office.onReady(async ({ host }) => {
       await loadIcons(token);
       ssReviewModal.classList.add("hidden");
       ssResetUploadButton();
-      showToast(`${added} icon${added !== 1 ? "s" : ""} added${failed ? `, ${failed} failed` : ""}`);
+      showToast(`${added} icon${added !== 1 ? "s" : ""} added${skipped ? `, ${skipped} skipped` : ""}${failed ? `, ${failed} failed` : ""}`);
       processNextSheet(); // continue with any remaining sheets
     } catch (err) {
       console.error("[Shutterstock] Approve failed:", err);
