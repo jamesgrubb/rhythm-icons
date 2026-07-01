@@ -1647,6 +1647,29 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   color: var(--text-2);
 }
 
+/* ---- Replace artwork (paste SVG) ---- */
+.replace-hint {
+  font-size: 11px;
+  color: var(--text-2);
+  line-height: 1.5;
+  margin: 2px 0 8px;
+}
+.svg-paste-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 56px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.svg-paste-status {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.svg-paste-ok { color: var(--accent); }
+.svg-paste-error { color: var(--danger); }
+
 .group-chips {
   display: flex;
   flex-wrap: wrap;

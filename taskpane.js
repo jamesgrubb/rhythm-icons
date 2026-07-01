@@ -648,6 +648,27 @@ Office.onReady(async ({ host }) => {
     }
   }
 
+  // Clean a pasted SVG (e.g. from Illustrator) for the library: strip XML
+  // declaration/doctype, ensure xmlns + viewBox, and keep it stroke-based
+  // (active fills → none). Returns null if the text isn't a valid SVG.
+  function prepPastedSvg(text) {
+    let svg = (text || "").trim();
+    if (!svg) return null;
+    svg = svg.replace(/<\?xml[^>]*\?>/gi, "").replace(/<!DOCTYPE[^>]*>/gi, "").trim();
+    const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+    if (doc.querySelector("parsererror") || !doc.querySelector("svg")) return null;
+    if (!/xmlns\s*=/.test(svg)) svg = svg.replace(/<svg/i, '<svg xmlns="http://www.w3.org/2000/svg"');
+    if (!/viewBox\s*=/i.test(svg)) {
+      const w = (svg.match(/width=["']([\d.]+)/i) || [])[1] || 24;
+      const h = (svg.match(/height=["']([\d.]+)/i) || [])[1] || 24;
+      svg = svg.replace(/<svg/i, `<svg viewBox="0 0 ${w} ${h}"`);
+    }
+    svg = svg
+      .replace(/fill\s*=\s*["'][^"']*["']/gi, m => /none/i.test(m) ? m : 'fill="none"')
+      .replace(/fill\s*:\s*[^;"'}\s]+/gi, m => /none/i.test(m) ? m : 'fill:none');
+    return svg;
+  }
+
   // ---- Edit icon (admin only) ----
   async function editIcon(icon) {
     if (currentUserRole !== 'admin') {
@@ -665,21 +686,54 @@ Office.onReady(async ({ host }) => {
     const clientsContainer = document.getElementById("edit-icon-clients");
     const cancelBtn = document.getElementById("edit-icon-cancel");
     const saveBtn = document.getElementById("edit-icon-save");
+    const svgInput = document.getElementById("edit-icon-svg-input");
+    const svgStatus = document.getElementById("edit-svg-status");
 
-    // Populate fields with current icon data
-    // Strip hardcoded colors so CSS styling works
-    let previewSvg = icon.svg;
-    previewSvg = previewSvg.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="currentColor"');
-    previewSvg = previewSvg.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="currentColor"');
-    previewSvg = previewSvg.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
-    previewSvg = previewSvg.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
+    // Render an SVG into the preview with library styling (stroke follows theme)
+    const showPreview = (svg) => {
+      let s = svg;
+      s = s.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="currentColor"');
+      s = s.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="currentColor"');
+      s = s.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
+      s = s.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
+      svgPreview.innerHTML = s;
+    };
 
-    svgPreview.innerHTML = previewSvg;
+    // Holds a pasted replacement SVG until Save (null = keep existing artwork)
+    let pendingSvg = null;
+
+    showPreview(icon.svg);
     nameInput.value = icon.name;
+    svgInput.value = "";
+    svgStatus.className = "svg-paste-status hidden";
 
     // Render group toggle-chips, pre-selecting the icon's current groups
     const currentGroupIds = (icon.clients || []).map(c => c.id);
     renderGroupChips(clientsContainer, currentGroupIds, { includeUnassigned: true });
+
+    // Paste-to-replace: validate + live-preview the pasted artwork
+    const onSvgInput = () => {
+      const raw = svgInput.value.trim();
+      if (!raw) {
+        pendingSvg = null;
+        svgStatus.className = "svg-paste-status hidden";
+        showPreview(icon.svg);
+        return;
+      }
+      const cleaned = prepPastedSvg(raw);
+      if (!cleaned) {
+        pendingSvg = null;
+        svgStatus.className = "svg-paste-status svg-paste-error";
+        svgStatus.textContent = "That doesn't look like valid SVG code.";
+        showPreview(icon.svg);
+        return;
+      }
+      pendingSvg = cleaned;
+      showPreview(cleaned);
+      svgStatus.className = "svg-paste-status svg-paste-ok";
+      svgStatus.textContent = "New artwork loaded — replaces on Save. Name, ID & tags stay the same.";
+    };
+    svgInput.addEventListener("input", onSvgInput);
 
     // Show modal
     modal.classList.remove("hidden");
@@ -693,6 +747,7 @@ Office.onReady(async ({ host }) => {
       saveBtn.removeEventListener("click", onSave);
       modal.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKey);
+      svgInput.removeEventListener("input", onSvgInput);
     };
 
     // Handle save
@@ -710,7 +765,7 @@ Office.onReady(async ({ host }) => {
         const payload = {
           id: icon.id,
           name: newName,
-          svg: icon.svg, // Keep existing SVG
+          svg: pendingSvg || icon.svg, // pasted replacement, else keep existing
           client_ids: newClientIds
         };
 
@@ -728,8 +783,9 @@ Office.onReady(async ({ host }) => {
           throw new Error(error.error || 'Failed to update icon');
         }
 
-        // Update local icon object to reflect the new group assignments
+        // Update local icon object to reflect the changes
         icon.name = newName;
+        if (pendingSvg) icon.svg = pendingSvg;
         icon.clients = allClients.filter(c => newClientIds.includes(String(c.id)))
           .map(c => ({ id: c.id, name: c.name }));
 
