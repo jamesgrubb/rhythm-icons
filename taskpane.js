@@ -1771,7 +1771,9 @@ Office.onReady(async ({ host }) => {
         if (profileRes.ok) {
           currentUserProfile = await profileRes.json();
           currentUserRole = currentUserProfile.role;
-          console.log('[Profile] User role:', currentUserRole, 'Tenant:', currentUserProfile.tenant.name);
+          if (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
+            console.log('[Profile] User role:', currentUserRole, 'Tenant:', currentUserProfile.tenant.name);
+          }
           updateUIForRole();
 
           // Expose for debugging

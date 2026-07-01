@@ -15,6 +15,11 @@ window.AUTH_CONFIG = {
 };
 const AUTH_CONFIG = window.AUTH_CONFIG;
 
+// Gated debug logging — off in production. Never pass tokens or raw dialog
+// messages to this (or any) logger.
+const AUTH_DEBUG = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+const alog = (...a) => { if (AUTH_DEBUG) console.log(...a); };
+
 const msalConfig = {
   auth: {
     clientId:    AUTH_CONFIG.clientId,
@@ -47,19 +52,19 @@ let interactionPromise = null;
 async function initMsal() {
   // Only initialize once globally
   if (window.__MSAL_INSTANCE__) {
-    console.log("[Auth] Using existing MSAL instance");
+    alog("[Auth] Using existing MSAL instance");
     msalInstance = window.__MSAL_INSTANCE__;
     return;
   }
 
-  console.log("[Auth] Creating new MSAL instance");
+  alog("[Auth] Creating new MSAL instance");
   msalInstance = new msal.PublicClientApplication(msalConfig);
   await msalInstance.initialize();
 
   // Store globally so all bootstrap calls use the same instance
   window.__MSAL_INSTANCE__ = msalInstance;
 
-  console.log("[Auth] MSAL instance initialized and stored globally");
+  alog("[Auth] MSAL instance initialized and stored globally");
 }
 
 /**
@@ -102,7 +107,7 @@ async function signIn() {
           account: accounts[0],
         });
         currentAccount = silentResult.account;
-        console.log("[Auth] Silent sign-in successful");
+        alog("[Auth] Silent sign-in successful");
         return silentResult.accessToken;
       } catch (silentErr) {
         console.warn("[Auth] Silent token acquisition failed, opening dialog", silentErr);
@@ -110,7 +115,7 @@ async function signIn() {
     }
 
     // Use Office Dialog API for authentication
-    console.log("[Auth] Opening Office Dialog for authentication...");
+    alog("[Auth] Opening Office Dialog for authentication...");
     const dialogUrl = window.location.origin + "/auth-dialog.html";
 
     return new Promise((resolve, reject) => {
@@ -125,17 +130,17 @@ async function signIn() {
 
           if (response.status === "success") {
             window.removeEventListener("message", messageHandler);
-            console.log("[Auth] Sign-in successful via postMessage:", response.account.username);
+            alog("[Auth] Sign-in successful via postMessage:", response.account.username);
 
             // Reinitialize MSAL to pick up the cached account from localStorage
-            console.log("[Auth] Reinitializing MSAL to load cached account...");
+            alog("[Auth] Reinitializing MSAL to load cached account...");
             msalInstance = new msal.PublicClientApplication(msalConfig);
             await msalInstance.initialize();
             window.__MSAL_INSTANCE__ = msalInstance;
 
             // Now get the account from the reinitialized instance
             const accounts = msalInstance.getAllAccounts();
-            console.log("[Auth] After reinit, found", accounts.length, "account(s)");
+            alog("[Auth] After reinit, found", accounts.length, "account(s)");
             if (accounts.length > 0) {
               currentAccount = accounts[0];
             } else {
@@ -171,24 +176,24 @@ async function signIn() {
           }
 
           const dialog = result.value;
-          console.log("[Auth] Dialog opened successfully, dialog object:", !!dialog);
-          console.log("[Auth] Dialog has addEventHandler?", typeof dialog.addEventHandler);
+          alog("[Auth] Dialog opened successfully, dialog object:", !!dialog);
+          alog("[Auth] Dialog has addEventHandler?", typeof dialog.addEventHandler);
 
           // Listen for messages from the dialog
           const messageReceivedHandler = async (arg) => {
-            console.log("[Auth] *** DialogMessageReceived event fired! ***", arg);
+            alog("[Auth] DialogMessageReceived event fired"); // never log arg — it carries the token
 
             if (dialogClosed) {
-              console.log("[Auth] Dialog already closed, ignoring message");
+              alog("[Auth] Dialog already closed, ignoring message");
               return;
             }
 
             dialogClosed = true;
-            console.log("[Auth] Closing dialog...");
+            alog("[Auth] Closing dialog...");
 
             try {
               dialog.close();
-              console.log("[Auth] Dialog.close() called successfully");
+              alog("[Auth] Dialog.close() called successfully");
             } catch (closeErr) {
               console.error("[Auth] Error calling dialog.close():", closeErr);
             }
@@ -196,23 +201,22 @@ async function signIn() {
             window.removeEventListener("message", messageHandler);
 
             try {
-              console.log("[Auth] Parsing message:", arg.message);
-              const response = JSON.parse(arg.message);
-              console.log("[Auth] Received message from dialog:", response.status);
+              const response = JSON.parse(arg.message); // do NOT log arg.message (token)
+              alog("[Auth] Received message from dialog:", response.status);
 
               if (response.status === "success") {
-                console.log("[Auth] Sign-in successful:", response.account.username);
+                alog("[Auth] Sign-in successful");
 
                 // Reinitialize MSAL to pick up the cached account from localStorage
                 // (the dialog wrote it, but our in-memory instance doesn't know about it yet)
-                console.log("[Auth] Reinitializing MSAL to load cached account...");
+                alog("[Auth] Reinitializing MSAL to load cached account...");
                 msalInstance = new msal.PublicClientApplication(msalConfig);
                 await msalInstance.initialize();
                 window.__MSAL_INSTANCE__ = msalInstance;
 
                 // Now get the account from the reinitialized instance
                 const accounts = msalInstance.getAllAccounts();
-                console.log("[Auth] After reinit, found", accounts.length, "account(s)");
+                alog("[Auth] After reinit, found", accounts.length, "account(s)");
                 if (accounts.length > 0) {
                   currentAccount = accounts[0];
                 } else {
@@ -229,25 +233,25 @@ async function signIn() {
                 reject(new Error(response.error || "Authentication failed"));
               }
             } catch (err) {
-              console.error("[Auth] Failed to parse dialog message:", err, "Raw message:", arg.message);
+              console.error("[Auth] Failed to parse dialog message:", err && err.message);
               reject(new Error("Failed to process authentication response"));
             }
           };
 
           dialog.addEventHandler(Office.EventType.DialogMessageReceived, messageReceivedHandler);
-          console.log("[Auth] DialogMessageReceived handler attached");
+          alog("[Auth] DialogMessageReceived handler attached");
 
           // Handle dialog closed by user
           dialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
-            console.log("[Auth] DialogEventReceived fired, error:", arg.error);
+            alog("[Auth] DialogEventReceived fired, error:", arg.error);
             if (dialogClosed) return;
-            console.log("[Auth] Dialog closed by user");
+            alog("[Auth] Dialog closed by user");
             dialogClosed = true;
             window.removeEventListener("message", messageHandler);
             reject(new Error("Authentication cancelled by user"));
           });
 
-          console.log("[Auth] All dialog event handlers attached");
+          alog("[Auth] All dialog event handlers attached");
         }
       );
     });
@@ -265,24 +269,17 @@ async function getAccessToken() {
       scopes: [AUTH_CONFIG.apiScope],
       account: currentAccount,
     });
-    console.log("[Auth] Token acquired - scopes:", result.scopes);
-    console.log("[Auth] Token preview:", result.accessToken.substring(0, 50) + "...");
-    // Decode JWT to check audience (for debugging)
-    const payload = JSON.parse(atob(result.accessToken.split('.')[1]));
-    console.log("[Auth] Token audience:", payload.aud);
-    console.log("[Auth] Expected audience:", AUTH_CONFIG.clientId);
+    alog("[Auth] Token acquired - scopes:", result.scopes);
     return result.accessToken;
   } catch (err) {
-    console.warn("[Auth] Silent token failed:", err);
+    alog("[Auth] Silent token failed:", err && err.message);
     // Token expired — re-acquire via popup (one interactive flow at a time)
     return withInteractionLock(async () => {
       const result = await msalInstance.acquireTokenPopup({
         scopes: [AUTH_CONFIG.apiScope],
         account: currentAccount,
       });
-      console.log("[Auth] Popup token acquired - scopes:", result.scopes);
-      const payload = JSON.parse(atob(result.accessToken.split('.')[1]));
-      console.log("[Auth] Token audience:", payload.aud);
+      alog("[Auth] Popup token acquired - scopes:", result.scopes);
       return result.accessToken;
     });
   }
@@ -318,26 +315,26 @@ function getCurrentAccount() {
  */
 async function tryRestoreSession() {
   if (!msalInstance) {
-    console.log("[Auth] tryRestoreSession: No MSAL instance");
+    alog("[Auth] tryRestoreSession: No MSAL instance");
     return null;
   }
 
   const accounts = msalInstance.getAllAccounts();
-  console.log("[Auth] tryRestoreSession: Found", accounts.length, "account(s)");
+  alog("[Auth] tryRestoreSession: Found", accounts.length, "account(s)");
 
   if (accounts.length === 0) return null;
 
   try {
-    console.log("[Auth] tryRestoreSession: Attempting silent token acquisition");
+    alog("[Auth] tryRestoreSession: Attempting silent token acquisition");
     const result = await msalInstance.acquireTokenSilent({
       scopes: [AUTH_CONFIG.apiScope],
       account: accounts[0],
     });
     currentAccount = result.account;
-    console.log("[Auth] tryRestoreSession: Success! Restored session for", currentAccount.username);
+    alog("[Auth] tryRestoreSession: Success! Restored session for", currentAccount.username);
     return result.accessToken;
   } catch (err) {
-    console.log("[Auth] tryRestoreSession: Failed -", err.message);
+    alog("[Auth] tryRestoreSession: Failed -", err.message);
     return null;
   }
 }
