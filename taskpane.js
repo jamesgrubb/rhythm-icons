@@ -719,6 +719,7 @@ Office.onReady(async ({ host }) => {
     const cancelBtn = document.getElementById("edit-icon-cancel");
     const saveBtn = document.getElementById("edit-icon-save");
     const svgInput = document.getElementById("edit-icon-svg-input");
+    const svgClearBtn = document.getElementById("edit-svg-clear");
     const svgStatus = document.getElementById("edit-svg-status");
 
     // Render an SVG into the preview with library styling (stroke follows theme)
@@ -730,6 +731,8 @@ Office.onReady(async ({ host }) => {
     showPreview(icon.svg);
     nameInput.value = icon.name;
     svgInput.value = "";
+    svgInput.classList.remove("hidden");
+    svgClearBtn.classList.add("hidden");
     svgStatus.className = "svg-paste-status hidden";
 
     // Render group toggle-chips, pre-selecting the icon's current groups
@@ -762,10 +765,24 @@ Office.onReady(async ({ host }) => {
       }
       pendingSvg = cleaned;
       showPreview(cleaned);
+      // Hide the code; the preview above now shows the pasted artwork
+      svgInput.classList.add("hidden");
+      svgClearBtn.classList.remove("hidden");
       svgStatus.className = "svg-paste-status svg-paste-ok";
       svgStatus.textContent = "New artwork loaded — replaces on Save.";
     };
     svgInput.addEventListener("input", onSvgInput);
+
+    const onSvgClear = () => {
+      pendingSvg = null;
+      svgInput.value = "";
+      svgInput.classList.remove("hidden");
+      svgClearBtn.classList.add("hidden");
+      svgStatus.className = "svg-paste-status hidden";
+      showPreview(icon.svg);
+      svgInput.focus();
+    };
+    svgClearBtn.addEventListener("click", onSvgClear);
 
     // Show modal
     modal.classList.remove("hidden");
@@ -780,6 +797,7 @@ Office.onReady(async ({ host }) => {
       modal.removeEventListener("click", onBackdrop);
       document.removeEventListener("keydown", onKey);
       svgInput.removeEventListener("input", onSvgInput);
+      svgClearBtn.removeEventListener("click", onSvgClear);
     };
 
     // Handle save

@@ -1703,17 +1703,16 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   align-items: center;
   justify-content: center;
   height: 120px;
-  background: var(--bg);
-  border: 1px solid var(--border-2);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  color: var(--text-2);
+  color: var(--text);
   margin-bottom: 8px;
 }
-.paste-preview svg { width: 48px; height: 48px; }
+.paste-preview svg { width: 64px; height: 64px; }
 .paste-preview svg * {
   stroke: currentColor !important;
   fill: none !important;
-  stroke-width: 1px !important;
 }
 .paste-clear {
   background: none;
