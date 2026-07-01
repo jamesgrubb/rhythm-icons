@@ -485,15 +485,11 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
     .slice(0, 12);
 
   // VALIDATE SVG CONTENT
-  // 1. Check viewBox is exactly "0 0 24 24"
+  // 1. Require a viewBox (any dimensions — icons display and insert correctly at
+  //    any viewBox; sheet, upload, and paste sources vary in size).
   const viewBoxMatch = svg.match(/viewBox=["']([^"']+)["']/);
   if (!viewBoxMatch) {
     return res.status(400).json({ error: "SVG must have a viewBox attribute" });
-  }
-  if (viewBoxMatch[1] !== "0 0 24 24") {
-    return res.status(400).json({
-      error: `Invalid viewBox "${viewBoxMatch[1]}" - must be "0 0 24 24"`
-    });
   }
 
   // 2. Check for fill attributes (stroke-based icons only)
