@@ -1668,9 +1668,11 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 }
 .svg-paste-status {
   margin-top: 8px;
+  margin-bottom: 12px;
   font-size: 11px;
   line-height: 1.4;
 }
+.svg-paste-status.hidden { margin: 0; }
 .svg-paste-ok { color: var(--accent); }
 .svg-paste-error { color: var(--danger); }
 

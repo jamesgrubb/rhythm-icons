@@ -2415,15 +2415,27 @@ Office.onReady(async ({ host }) => {
     pasteIconStatus.className = "svg-paste-status hidden";
   }
 
-  // As soon as something is pasted, validate and show the icon (not the code)
+  // As soon as something is pasted, validate and show the icon (never the code)
   pasteIconSvg.addEventListener("input", () => {
     const raw = pasteIconSvg.value.trim();
-    if (!raw) { pastePendingSvg = null; showPastePreview(null); pasteIconStatus.className = "svg-paste-status hidden"; return; }
-    if (hasActiveFill(raw)) { pastePendingSvg = null; showPastePreview(null); setPasteStatus("svg-paste-error", "This icon has outlined strokes or fills — icons must be stroke-based."); return; }
+    if (!raw) { resetPasteBox(); return; }
+
+    // Content present → hide the raw code either way, offer a clear/redo
+    pasteIconSvg.classList.add("hidden");
+    pasteClearBtn.classList.remove("hidden");
+
+    const showErr = msg => {
+      pastePendingSvg = null;
+      pasteIconPreview.classList.add("hidden");
+      setPasteStatus("svg-paste-error", msg);
+    };
+    if (hasActiveFill(raw)) return showErr("This icon has outlined strokes or fills — icons must be stroke-based.");
     const cleaned = prepPastedSvg(raw);
-    if (!cleaned) { pastePendingSvg = null; showPastePreview(null); setPasteStatus("svg-paste-error", "That doesn't look like a valid icon."); return; }
+    if (!cleaned) return showErr("That doesn't look like a valid icon.");
+
     pastePendingSvg = cleaned;
-    showPastePreview(cleaned);
+    pasteIconPreview.innerHTML = normalizeSvgDisplay(cleaned);
+    pasteIconPreview.classList.remove("hidden");
     pasteIconStatus.className = "svg-paste-status hidden";
   });
 
