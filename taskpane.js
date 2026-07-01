@@ -2329,6 +2329,7 @@ Office.onReady(async ({ host }) => {
   });
 
   // Auto-name a single SVG via Gemini (same naming used for sheet segments).
+  // Returns { name, tags }.
   async function autoNameSvg(svg) {
     try {
       const token = await getAccessToken();
@@ -2337,10 +2338,10 @@ Office.onReady(async ({ host }) => {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ svg })
       });
-      if (!res.ok) return null;
+      if (!res.ok) return { name: null, tags: [] };
       const data = await res.json();
-      return data.name || null;
-    } catch { return null; }
+      return { name: data.name || null, tags: data.tags || [] };
+    } catch { return { name: null, tags: [] }; }
   }
 
   const setPasteStatus = (cls, msg) => { pasteIconStatus.className = "svg-paste-status " + cls; pasteIconStatus.textContent = msg; };
@@ -2384,43 +2385,20 @@ Office.onReady(async ({ host }) => {
   // ---- Add the pasted icon → auto-name → add to library ----
   async function addPastedIcon() {
     const setStatus = setPasteStatus;
-    const setErr = msg => setStatus("svg-paste-error", msg);
-
     const cleaned = pastePendingSvg;
-    if (!cleaned) return setErr("Paste an icon first.");
+    if (!cleaned) return setStatus("svg-paste-error", "Paste an icon first.");
 
     pasteIconAdd.disabled = true;
     try {
-      // Auto-name like sheet segments
+      // Auto-name (name + tags) like sheet segments, then hand off to the same
+      // review UI as sheet-extracted icons (editable name/tags, groups, badge).
       setStatus("", "Naming…");
-      let name = await autoNameSvg(cleaned);
-      if (!name) name = "icon";
-
-      // Unique id (never overwrite an existing icon)
-      const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "icon";
-      let id = base, n = 2;
-      while (allIcons.some(i => i.id === id)) id = `${base}-${n++}`;
-
-      // Upload straight to the library with the selected groups
-      setStatus("", "Adding to library…");
-      const token = await getAccessToken();
-      const clientIds = getSelectedGroupIds(uploadClients);
-      const res = await fetch(`${ICON_API_BASE}/icons`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ id, name: name.charAt(0).toUpperCase() + name.slice(1), svg: cleaned, client_ids: clientIds })
-      });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || "Upload failed");
-      }
-
-      await loadIcons(token);
+      const { name, tags } = await autoNameSvg(cleaned);
+      const candidate = { svg: cleaned, name: name || "icon", tags: tags || [], stroke_status: "valid" };
       resetPasteBox();
-      setStatus("svg-paste-ok", `Added "${name}" to the library.`);
-      showToast(`"${name}" added`);
+      await openSsReview(null, [candidate]);
     } catch (err) {
-      setErr(`Couldn't add: ${err.message}`);
+      setStatus("svg-paste-error", `Couldn't prepare: ${err.message}`);
     } finally {
       pasteIconAdd.disabled = false;
     }
@@ -2936,11 +2914,13 @@ Office.onReady(async ({ host }) => {
         }
       }
 
-      // Mark job done and refresh the curated library
-      await fetch(`${ICON_API_BASE}/shutterstock/jobs/${ssReviewJobId}/complete`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` }
-      }).catch(() => {});
+      // Mark the source job done (pasted single icons have no job)
+      if (ssReviewJobId) {
+        await fetch(`${ICON_API_BASE}/shutterstock/jobs/${ssReviewJobId}/complete`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => {});
+      }
 
       await loadIcons(token);
       ssReviewModal.classList.add("hidden");
