@@ -906,11 +906,20 @@ app.post("/api/icons/name-svg", requireAuth, ensureTenantExists, extractUserRole
   }
   try {
     const gemini = require("./lib/gemini");
+    const svgProcess = require("./lib/svgProcess");
     const { Resvg } = require("@resvg/resvg-js");
 
-    // Render to a small PNG (drop any existing width/height so 96x96 applies)
-    let render = svg.replace(/\s(width|height)\s*=\s*["'][^"']*["']/gi, '')
-                    .replace(/<svg\b/i, '<svg width="96" height="96"');
+    // Normalize to a clean 0 0 24 24 library icon (same as a sheet segment) so
+    // circle backgrounds and sizing behave. Fall back to the original if it has
+    // no stroke geometry to normalize.
+    let normalized = null;
+    try { normalized = await svgProcess.normalizeIconSvg(svg); }
+    catch (e) { console.warn("[name-svg] normalize failed:", e.message); }
+    const finalSvg = normalized || svg;
+
+    // Render to a small PNG for naming (drop any width/height so 96x96 applies)
+    const render = finalSvg.replace(/\s(width|height)\s*=\s*["'][^"']*["']/gi, '')
+                           .replace(/<svg\b/i, '<svg width="96" height="96"');
     let png;
     try {
       png = new Resvg(render, { background: "white" }).render().asPng();
@@ -920,7 +929,7 @@ app.post("/api/icons/name-svg", requireAuth, ensureTenantExists, extractUserRole
 
     const names = await gemini.nameIconsOrdered([png]);
     const meta = names && names[0];
-    res.json({ name: (meta && meta.label) || null, tags: (meta && meta.tags) || [] });
+    res.json({ name: (meta && meta.label) || null, tags: (meta && meta.tags) || [], svg: finalSvg });
   } catch (error) {
     console.error("[API] name-svg error:", error.message);
     res.status(500).json({ error: "Failed to name icon" });
