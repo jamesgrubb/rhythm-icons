@@ -541,11 +541,14 @@ Office.onReady(async ({ host }) => {
       thumbnailSvg = thumbnailSvg.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
       thumbnailSvg = thumbnailSvg.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
 
-      // Admins manage their own tenant's icons; everyone else sees icon + name only
-      const isAdminForIcon = currentUserRole === 'admin' && currentUserProfile &&
+      // Admins can edit their own tenant's icons and delete their own OR shared
+      // (public/seeded) icons. Everyone else sees icon + name only.
+      const isOwnIcon = currentUserRole === 'admin' && currentUserProfile &&
         (!icon.tenant_name || icon.tenant_name === currentUserProfile.tenant.name);
-      const selecting = selectionMode && isAdminForIcon;
-      const showActions = isAdminForIcon && !selecting;
+      const canEdit = isOwnIcon;
+      const canDelete = currentUserRole === 'admin' && (isOwnIcon || icon.is_public);
+      const selecting = selectionMode && canDelete;
+      const showActions = (canEdit || canDelete) && !selecting;
 
       card.innerHTML = `
         <div class="card-icon">${thumbnailSvg}</div>
@@ -557,26 +560,27 @@ Office.onReady(async ({ host }) => {
       if (selecting) {
         // Selection mode: clicking the card toggles selection (no insert)
         card.classList.add("selectable");
-        if (selectedIds.has(icon.id)) card.classList.add("selected");
+        if (selectedIds.has(icon.uuid)) card.classList.add("selected");
         const check = document.createElement("div");
         check.className = "select-check";
         check.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
         card.appendChild(check);
         card.addEventListener("click", () => toggleSelect(icon, card));
       } else {
-        // Edit + delete buttons (admins only), shown in the inactive grey state
         if (showActions) {
           const actions = card.querySelector(".card-actions");
 
-          const editBtn = document.createElement("button");
-          editBtn.className = "icon-edit-btn";
-          editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
-          editBtn.title = "Edit icon";
-          editBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            editIcon(icon);
-          });
-          actions.appendChild(editBtn);
+          if (canEdit) {
+            const editBtn = document.createElement("button");
+            editBtn.className = "icon-edit-btn";
+            editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+            editBtn.title = "Edit icon";
+            editBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              editIcon(icon);
+            });
+            actions.appendChild(editBtn);
+          }
 
           const deleteBtn = document.createElement("button");
           deleteBtn.className = "icon-delete-btn";
@@ -604,8 +608,9 @@ Office.onReady(async ({ host }) => {
       return;
     }
 
+    const sharedWarning = icon.is_public ? " This is a shared icon — it will be removed for everyone." : "";
     const confirmed = await customConfirm(
-      `Delete "${icon.name}"?`,
+      `Delete "${icon.name}"?${sharedWarning}`,
       'Delete Icon'
     );
 
@@ -615,7 +620,7 @@ Office.onReady(async ({ host }) => {
 
     try {
       const token = await getAccessToken();
-      const res = await fetch(`${ICON_API_BASE}/icons/${icon.id}`, {
+      const res = await fetch(`${ICON_API_BASE}/icons/${icon.uuid}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -626,7 +631,7 @@ Office.onReady(async ({ host }) => {
       }
 
       // Remove from local array
-      allIcons = allIcons.filter(i => i.id !== icon.id);
+      allIcons = allIcons.filter(i => i.uuid !== icon.uuid);
 
       // Re-render UI
       invalidateCountCache();
@@ -766,11 +771,11 @@ Office.onReady(async ({ host }) => {
   }
 
   function toggleSelect(icon, card) {
-    if (selectedIds.has(icon.id)) {
-      selectedIds.delete(icon.id);
+    if (selectedIds.has(icon.uuid)) {
+      selectedIds.delete(icon.uuid);
       card.classList.remove("selected");
     } else {
-      selectedIds.add(icon.id);
+      selectedIds.add(icon.uuid);
       card.classList.add("selected");
     }
     updateSelectionUI();
@@ -787,11 +792,11 @@ Office.onReady(async ({ host }) => {
 
   function toggleSelectAll() {
     const allSelected = lastVisibleIcons.length > 0 &&
-      lastVisibleIcons.every(i => selectedIds.has(i.id));
+      lastVisibleIcons.every(i => selectedIds.has(i.uuid));
     if (allSelected) {
       selectedIds.clear();
     } else {
-      lastVisibleIcons.forEach(i => selectedIds.add(i.id));
+      lastVisibleIcons.forEach(i => selectedIds.add(i.uuid));
     }
     renderGrid();
     updateSelectionUI();
@@ -802,8 +807,10 @@ Office.onReady(async ({ host }) => {
     if (ids.length === 0) return;
 
     const groupLabel = (activeClient && activeClient !== "All") ? ` from "${activeClient}"` : "";
+    const anyShared = allIcons.some(i => selectedIds.has(i.uuid) && i.is_public);
+    const sharedWarning = anyShared ? " Some are shared icons and will be removed for everyone." : "";
     const confirmed = await customConfirm(
-      `Delete ${ids.length} icon${ids.length !== 1 ? "s" : ""}${groupLabel}? This permanently removes ${ids.length !== 1 ? "them" : "it"} from the library and can't be undone.`,
+      `Delete ${ids.length} icon${ids.length !== 1 ? "s" : ""}${groupLabel}? This permanently removes ${ids.length !== 1 ? "them" : "it"} from the library and can't be undone.${sharedWarning}`,
       "Delete icons"
     );
     if (!confirmed) return;
@@ -822,7 +829,7 @@ Office.onReady(async ({ host }) => {
       const data = await res.json();
 
       const removed = new Set(ids);
-      allIcons = allIcons.filter(i => !removed.has(i.id));
+      allIcons = allIcons.filter(i => !removed.has(i.uuid));
 
       exitSelectionMode();
       invalidateCountCache();

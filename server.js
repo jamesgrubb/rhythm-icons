@@ -347,7 +347,7 @@ app.get("/api/icons", requireAuth, ensureTenantExists, extractUserRole, requireR
     // Fetch icons for this tenant OR public icons, aggregating their assigned
     // groups (clients) into a `clients` array (many-to-many via icon_clients).
     const result = await pool.query(
-      `SELECT i.icon_id as id, i.name, i.category, i.svg, i.tags, i.is_public,
+      `SELECT i.icon_id as id, i.id as uuid, i.name, i.category, i.svg, i.tags, i.is_public,
               t.name as tenant_name,
               COALESCE(
                 json_agg(json_build_object('id', c.id, 'name', c.name) ORDER BY c.name)
@@ -846,13 +846,17 @@ app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
 
 // DELETE /api/icons/:id — delete an icon (admin only)
 app.delete("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
-  const { id } = req.params;
+  const { id } = req.params; // globally-unique icon uuid
   const tenantId = req.user.tenantId;
 
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    return res.status(400).json({ error: 'Invalid icon id' });
+  }
+
   try {
-    // Verify ownership before deleting
+    // Admins may delete their own tenant's icons or shared (public/seeded) icons
     const result = await pool.query(
-      'DELETE FROM icons WHERE icon_id = $1 AND tenant_id = $2 RETURNING id',
+      'DELETE FROM icons WHERE id = $1::uuid AND (tenant_id = $2 OR is_public = true) RETURNING id',
       [id, tenantId]
     );
 
@@ -875,13 +879,18 @@ app.post("/api/icons/bulk-delete", requireAuth, ensureTenantExists, extractUserR
   if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: "Provide a non-empty 'ids' array" });
   }
-  const iconIds = [...new Set(ids.map(String))];
+  // ids are globally-unique icon uuids
+  const uuids = [...new Set(ids.map(String))].filter(x => /^[0-9a-f-]{36}$/i.test(x));
+  if (uuids.length === 0) {
+    return res.status(400).json({ error: "No valid icon ids" });
+  }
 
   try {
-    // Tenant-scoped delete; icon_clients rows cascade via the icons.id FK
+    // Admins may delete their own tenant's icons or shared (public/seeded) icons;
+    // icon_clients rows cascade via the icons.id FK.
     const result = await pool.query(
-      'DELETE FROM icons WHERE tenant_id = $1 AND icon_id = ANY($2::text[]) RETURNING icon_id',
-      [tenantId, iconIds]
+      'DELETE FROM icons WHERE id = ANY($2::uuid[]) AND (tenant_id = $1 OR is_public = true) RETURNING id',
+      [tenantId, uuids]
     );
 
     console.log('[API] Bulk delete by admin:', req.user.email, '-', result.rowCount, 'icons');
