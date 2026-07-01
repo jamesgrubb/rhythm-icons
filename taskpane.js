@@ -122,13 +122,13 @@ Office.onReady(async ({ host }) => {
   }
 
   // Custom confirm dialog (window.confirm not supported in Office Add-ins)
-  function customConfirm(message, title = "Confirm") {
+  function customConfirm(message, title = "Confirm", { confirmLabel = "Delete" } = {}) {
     return new Promise((resolve) => {
       confirmTitle.textContent = title;
       confirmMessage.textContent = message;
       confirmInput.classList.add("hidden");
       confirmCancelBtn.style.display = 'block';
-      confirmOkBtn.textContent = 'Delete';
+      confirmOkBtn.textContent = confirmLabel;
       confirmModal.classList.remove("hidden");
 
       const handleOk = () => {
@@ -1715,7 +1715,7 @@ Office.onReady(async ({ host }) => {
 
   // ---- Sign-out ----
   signoutBtn.addEventListener("click", async () => {
-    const confirmed = await customConfirm("Sign out of the icon library?", "Sign out");
+    const confirmed = await customConfirm("Sign out of the icon library?", "Sign out", { confirmLabel: "Sign out" });
     if (!confirmed) return;
     try {
       await signOut();
