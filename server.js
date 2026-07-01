@@ -936,6 +936,25 @@ app.post("/api/icons/name-svg", requireAuth, ensureTenantExists, extractUserRole
   }
 });
 
+// POST /api/icons/normalize-svg — normalize a single icon to 0 0 24 24 (admin),
+// no naming. Used by the edit "replace artwork" paste.
+app.post("/api/icons/normalize-svg", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { svg } = req.body;
+  if (!svg || typeof svg !== 'string' || !/<svg[\s>]/i.test(svg)) {
+    return res.status(400).json({ error: "Provide SVG markup" });
+  }
+  try {
+    const svgProcess = require("./lib/svgProcess");
+    let normalized = null;
+    try { normalized = await svgProcess.normalizeIconSvg(svg); }
+    catch (e) { console.warn("[normalize-svg] failed:", e.message); }
+    res.json({ svg: normalized || svg });
+  } catch (error) {
+    console.error("[API] normalize-svg error:", error.message);
+    res.status(500).json({ error: "Failed to normalize icon" });
+  }
+});
+
 // Run migrations before starting server (production only)
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {

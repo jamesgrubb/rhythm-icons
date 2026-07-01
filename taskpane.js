@@ -812,10 +812,20 @@ Office.onReady(async ({ host }) => {
 
       try {
         const token = await getAccessToken();
+
+        // Normalize pasted replacement artwork to 0 0 24 24 so it scales inside
+        // the viewBox and the circle background renders round (not square).
+        let svgToSave = icon.svg;
+        if (pendingSvg) {
+          saveBtn.disabled = true;
+          saveBtn.textContent = "Saving…";
+          svgToSave = (await normalizeSvg(pendingSvg)) || pendingSvg;
+        }
+
         const payload = {
           id: icon.id,
           name: newName,
-          svg: pendingSvg || icon.svg, // pasted replacement, else keep existing
+          svg: svgToSave,
           client_ids: newClientIds
         };
 
@@ -835,7 +845,7 @@ Office.onReady(async ({ host }) => {
 
         // Update local icon object to reflect the changes
         icon.name = newName;
-        if (pendingSvg) icon.svg = pendingSvg;
+        if (pendingSvg) icon.svg = svgToSave;
         icon.clients = allClients.filter(c => newClientIds.includes(String(c.id)))
           .map(c => ({ id: c.id, name: c.name }));
 
@@ -850,6 +860,9 @@ Office.onReady(async ({ host }) => {
       } catch (error) {
         console.error('[Edit] Error:', error);
         showToast(`Error: ${error.message}`);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save Changes";
       }
     };
 
@@ -2345,6 +2358,22 @@ Office.onReady(async ({ host }) => {
     // Allow re-selecting the same file(s) again
     e.target.value = "";
   });
+
+  // Normalize a single icon to a clean 0 0 24 24 library icon (server-side,
+  // same treatment as sheet segments). Returns the normalized svg or null.
+  async function normalizeSvg(svg) {
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/icons/normalize-svg`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ svg })
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.svg || null;
+    } catch { return null; }
+  }
 
   // Auto-name a single SVG via Gemini (same naming used for sheet segments).
   // Returns { name, tags }.
