@@ -2385,10 +2385,10 @@ Office.onReady(async ({ host }) => {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ svg })
       });
-      if (!res.ok) return { name: null, tags: [], svg: null };
+      if (!res.ok) return { name: null, tags: [], svg: null, duplicate: null };
       const data = await res.json();
-      return { name: data.name || null, tags: data.tags || [], svg: data.svg || null };
-    } catch { return { name: null, tags: [], svg: null }; }
+      return { name: data.name || null, tags: data.tags || [], svg: data.svg || null, duplicate: data.duplicate || null };
+    } catch { return { name: null, tags: [], svg: null, duplicate: null }; }
   }
 
   const setPasteStatus = (cls, msg) => { pasteIconStatus.className = "svg-paste-status " + cls; pasteIconStatus.textContent = msg; };
@@ -2456,7 +2456,22 @@ Office.onReady(async ({ host }) => {
       // Auto-name (name + tags) like sheet segments, then hand off to the same
       // review UI as sheet-extracted icons (editable name/tags, groups, badge).
       setStatus("", "Naming…");
-      const { name, tags, svg: normSvg } = await autoNameSvg(cleaned);
+      const { name, tags, svg: normSvg, duplicate } = await autoNameSvg(cleaned);
+
+      // Warn if this looks identical to an icon already in the library
+      if (duplicate) {
+        const proceed = await customConfirm(
+          `This looks identical to "${duplicate.name}" already in your library. Add it anyway?`,
+          "Possible duplicate",
+          { confirmLabel: "Add anyway", danger: false }
+        );
+        if (!proceed) {
+          resetPasteBox();
+          showToast(`Skipped — matches "${duplicate.name}"`);
+          return;
+        }
+      }
+
       // Use the server-normalized 24x24 icon so circle backgrounds/sizing work
       const candidate = { svg: normSvg || cleaned, name: name || "icon", tags: tags || [], stroke_status: "valid" };
       resetPasteBox();

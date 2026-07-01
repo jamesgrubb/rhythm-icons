@@ -519,9 +519,12 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
       return res.status(403).json({ error: "No tenant found for user" });
     }
 
+    let phash = null;
+    try { phash = require("./lib/phash").computePhash(svg); } catch (_) {}
+
     const result = await pool.query(
-      `INSERT INTO icons (tenant_id, icon_id, name, category, svg, client_id, tags)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO icons (tenant_id, icon_id, name, category, svg, client_id, tags, phash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (tenant_id, icon_id)
        DO UPDATE SET
          name = EXCLUDED.name,
@@ -529,9 +532,10 @@ app.post("/api/icons", requireAuth, ensureTenantExists, extractUserRole, require
          svg = EXCLUDED.svg,
          client_id = EXCLUDED.client_id,
          tags = EXCLUDED.tags,
+         phash = EXCLUDED.phash,
          updated_at = CURRENT_TIMESTAMP
        RETURNING id, (xmax = 0) AS inserted`,
-      [tenantId, id, name, category || 'Uncategorized', svg, groupIds[0] || null, JSON.stringify(cleanTags)]
+      [tenantId, id, name, category || 'Uncategorized', svg, groupIds[0] || null, JSON.stringify(cleanTags), phash]
     );
 
     // Replace this icon's group assignments (validate the groups belong to tenant)
@@ -808,6 +812,10 @@ app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
     }
     const iconUuid = existing.rows[0].id;
 
+    // Recompute the perceptual hash when the artwork changes
+    let newPhash = null;
+    if (svg) { try { newPhash = require("./lib/phash").computePhash(svg); } catch (_) {} }
+
     await pool.query(
       `UPDATE icons
        SET name = COALESCE($1, name),
@@ -815,9 +823,10 @@ app.put("/api/icons/:id", requireAuth, ensureTenantExists, extractUserRole, requ
            svg = COALESCE($3, svg),
            is_public = COALESCE($4, is_public),
            client_id = $5,
+           phash = COALESCE($8, phash),
            updated_at = NOW()
        WHERE icon_id = $6 AND tenant_id = $7`,
-      [name, category, svg, is_public, groupIds[0] || null, id, tenantId]
+      [name, category, svg, is_public, groupIds[0] || null, id, tenantId, newPhash]
     );
 
     // Replace group assignments
@@ -929,7 +938,27 @@ app.post("/api/icons/name-svg", requireAuth, ensureTenantExists, extractUserRole
 
     const names = await gemini.nameIconsOrdered([png]);
     const meta = names && names[0];
-    res.json({ name: (meta && meta.label) || null, tags: (meta && meta.tags) || [], svg: finalSvg });
+
+    // Look for a visually-identical icon already in the library (perceptual hash)
+    let duplicate = null;
+    try {
+      const { computePhash, hamming, DUP_THRESHOLD } = require("./lib/phash");
+      const ph = computePhash(finalSvg);
+      if (ph) {
+        const rows = await pool.query(
+          "SELECT icon_id AS id, name, phash FROM icons WHERE (tenant_id = $1 OR is_public = true) AND phash IS NOT NULL",
+          [req.user.tenantId]
+        );
+        let best = null, bestD = Infinity;
+        for (const row of rows.rows) {
+          const d = hamming(ph, row.phash);
+          if (d < bestD) { bestD = d; best = row; }
+        }
+        if (best && bestD <= DUP_THRESHOLD) duplicate = { id: best.id, name: best.name, distance: bestD };
+      }
+    } catch (e) { console.warn("[name-svg] dup check failed:", e.message); }
+
+    res.json({ name: (meta && meta.label) || null, tags: (meta && meta.tags) || [], svg: finalSvg, duplicate });
   } catch (error) {
     console.error("[API] name-svg error:", error.message);
     res.status(500).json({ error: "Failed to name icon" });
