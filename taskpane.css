@@ -856,6 +856,10 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   transition: opacity 0.2s var(--ease);
 }
 
+/* Confirm/alert/prompt dialog must sit above any other modal (e.g. the review
+   modal) so its buttons are clickable — otherwise an awaited confirm hangs. */
+#confirm-modal { z-index: 400; }
+
 .modal-overlay:not(.hidden) {
   opacity: 1;
   pointer-events: all;
