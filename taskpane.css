@@ -445,7 +445,7 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   top: 0;
   z-index: 5;
   margin: 0 -10px;
-  padding: 10px 10px 8px;
+  padding: 14px 12px 14px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
@@ -458,7 +458,7 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   flex-wrap: wrap;
   gap: 8px;
   row-gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
   padding: 0 2px;
 }
 .size-label { font-size: 11px; color: var(--text-3); }
@@ -502,7 +502,7 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
   padding: 0 2px;
 }
 .color-label { font-size: 11px; color: var(--text-3); }
@@ -743,8 +743,8 @@ main::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 .selection-count {
