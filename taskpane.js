@@ -72,7 +72,6 @@ Office.onReady(async ({ host }) => {
   const addClientBtn         = document.getElementById("add-client-btn");
   const uploadClients        = document.getElementById("upload-clients");
   const uploadStatus         = document.getElementById("upload-status");
-  const pasteIconName        = document.getElementById("paste-icon-name");
   const pasteIconSvg         = document.getElementById("paste-icon-svg");
   const pasteIconAdd         = document.getElementById("paste-icon-add");
   const pasteIconStatus      = document.getElementById("paste-icon-status");
@@ -2143,7 +2142,6 @@ Office.onReady(async ({ host }) => {
     uploadedIcons = [];
     previewSection.classList.add("hidden");
     uploadStatus.classList.add("hidden");
-    pasteIconName.value = "";
     pasteIconSvg.value = "";
     pasteIconStatus.className = "svg-paste-status hidden";
 
@@ -2343,7 +2341,7 @@ Office.onReady(async ({ host }) => {
     } catch { return null; }
   }
 
-  // ---- Paste a single icon (from Illustrator) into the upload batch ----
+  // ---- Paste a single icon (from Illustrator) → auto-name → add to library ----
   async function addPastedIcon() {
     const raw = pasteIconSvg.value.trim();
     const setStatus = (cls, msg) => { pasteIconStatus.className = "svg-paste-status " + cls; pasteIconStatus.textContent = msg; };
@@ -2354,23 +2352,41 @@ Office.onReady(async ({ host }) => {
     const cleaned = prepPastedSvg(raw);
     if (!cleaned) return setErr("That doesn't look like a valid icon.");
 
-    // Use the typed name, or auto-name it (like sheets do) when left blank
-    let name = pasteIconName.value.trim();
-    if (!name) {
+    pasteIconAdd.disabled = true;
+    try {
+      // Auto-name like sheet segments
       setStatus("", "Naming…");
-      pasteIconAdd.disabled = true;
-      name = await autoNameSvg(cleaned);
-      pasteIconAdd.disabled = false;
+      let name = await autoNameSvg(cleaned);
       if (!name) name = "icon";
+
+      // Unique id (never overwrite an existing icon)
+      const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "icon";
+      let id = base, n = 2;
+      while (allIcons.some(i => i.id === id)) id = `${base}-${n++}`;
+
+      // Upload straight to the library with the selected groups
+      setStatus("", "Adding to library…");
+      const token = await getAccessToken();
+      const clientIds = getSelectedGroupIds(uploadClients);
+      const res = await fetch(`${ICON_API_BASE}/icons`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name: name.charAt(0).toUpperCase() + name.slice(1), svg: cleaned, client_ids: clientIds })
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || "Upload failed");
+      }
+
+      await loadIcons(token);
+      pasteIconSvg.value = "";
+      setStatus("svg-paste-ok", `Added "${name}" to the library.`);
+      showToast(`"${name}" added`);
+    } catch (err) {
+      setErr(`Couldn't add: ${err.message}`);
+    } finally {
+      pasteIconAdd.disabled = false;
     }
-
-    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    uploadedIcons.push({ id, name: name.charAt(0).toUpperCase() + name.slice(1), svg: cleaned });
-
-    pasteIconName.value = "";
-    pasteIconSvg.value = "";
-    setStatus("svg-paste-ok", `Added "${name}" — Upload to Library when ready.`);
-    refreshUploadPreview();
   }
   pasteIconAdd.addEventListener("click", addPastedIcon);
 
@@ -2401,11 +2417,14 @@ Office.onReady(async ({ host }) => {
       try {
         let svgData = icon.svg.trim();
 
-        // Strip hardcoded colors to make icons light gray
-        svgData = svgData.replace(/stroke=["']#[0-9a-fA-F]{3,6}["']/g, 'stroke="#999"');
-        svgData = svgData.replace(/stroke=["']rgb\([^)]+\)["']/g, 'stroke="#999"');
-        svgData = svgData.replace(/fill=["']#[0-9a-fA-F]{3,6}["']/g, 'fill="none"');
-        svgData = svgData.replace(/fill=["']rgb\([^)]+\)["']/g, 'fill="none"');
+        // Rendered as an <img>, so currentColor resolves to black — bake in an
+        // explicit light grey for every stroke (attributes, styles, <style>
+        // blocks, and currentColor) and drop fills.
+        svgData = svgData
+          .replace(/stroke\s*=\s*["'][^"']*["']/gi, m => /none/i.test(m) ? m : 'stroke="#b5b5bd"')
+          .replace(/stroke\s*:\s*[^;"'}\s]+/gi, m => /none/i.test(m) ? m : 'stroke:#b5b5bd')
+          .replace(/fill\s*=\s*["'][^"']*["']/gi, m => /none/i.test(m) ? m : 'fill="none"')
+          .replace(/fill\s*:\s*[^;"'}\s]+/gi, m => /none/i.test(m) ? m : 'fill:none');
 
         // Ensure proper xmlns
         if (!svgData.includes('xmlns=')) {
