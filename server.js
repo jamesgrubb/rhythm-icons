@@ -991,6 +991,44 @@ app.post("/api/icons/phash-check", requireAuth, ensureTenantExists, extractUserR
   }
 });
 
+// POST /api/icons/name-batch — normalize + AI-name several icons at once
+// (admin). Returns [{ name, tags, svg }] aligned with the input svgs.
+app.post("/api/icons/name-batch", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { svgs } = req.body;
+  if (!Array.isArray(svgs) || svgs.length === 0) {
+    return res.status(400).json({ error: "Provide a non-empty svgs[]" });
+  }
+  try {
+    const gemini = require("./lib/gemini");
+    const svgProcess = require("./lib/svgProcess");
+    const { Resvg } = require("@resvg/resvg-js");
+
+    // Normalize each to a clean 0 0 24 24 icon (fallback to original)
+    const finals = await Promise.all(svgs.map(async (svg) => {
+      try { return (await svgProcess.normalizeIconSvg(svg)) || svg; }
+      catch { return svg; }
+    }));
+
+    // Render each to a small PNG and name them in order via Gemini
+    const pngs = finals.map((svg) => {
+      try {
+        const r = svg.replace(/\s(width|height)\s*=\s*["'][^"']*["']/gi, "").replace(/<svg\b/i, '<svg width="96" height="96"');
+        return new Resvg(r, { background: "white" }).render().asPng();
+      } catch { return Buffer.alloc(0); }
+    });
+    const names = await gemini.nameIconsOrdered(pngs);
+    const results = finals.map((svg, i) => ({
+      name: (names[i] && names[i].label) || null,
+      tags: (names[i] && names[i].tags) || [],
+      svg
+    }));
+    res.json({ results });
+  } catch (error) {
+    console.error("[API] name-batch error:", error.message);
+    res.status(500).json({ error: "Failed to name icons" });
+  }
+});
+
 // POST /api/icons/normalize-svg — normalize a single icon to 0 0 24 24 (admin),
 // no naming. Used by the edit "replace artwork" paste.
 app.post("/api/icons/normalize-svg", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {

@@ -2343,6 +2343,31 @@ Office.onReady(async ({ host }) => {
 
     if (failedFiles.length > 0) await alertUploadFailures(failedFiles);
 
+    // AI-name the individual files (users name poorly) + normalize to 24x24
+    if (uploadedIcons.length > 0) {
+      uploadStatus.classList.remove("hidden", "upload-status-error");
+      uploadStatus.textContent = `Naming ${uploadedIcons.length} icon${uploadedIcons.length > 1 ? "s" : ""}…`;
+      const named = await nameBatch(uploadedIcons.map(i => i.svg));
+      if (named) {
+        const usedIds = new Set(); // keep names unique within this batch
+        uploadedIcons.forEach((icon, i) => {
+          const r = named[i];
+          if (!r) return;
+          if (r.svg) icon.svg = r.svg;             // normalized 24x24
+          if (r.tags && r.tags.length) icon.tags = r.tags;
+          if (r.name) {
+            icon.name = r.name.charAt(0).toUpperCase() + r.name.slice(1);
+            let base = r.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "icon";
+            let id = base, n = 2;
+            while (usedIds.has(id)) id = `${base}-${n++}`;
+            usedIds.add(id);
+            icon.id = id;
+          }
+        });
+      }
+      uploadStatus.classList.add("hidden");
+    }
+
     // Sheets: split + name + review, one at a time
     if (sheetFiles.length > 0) {
       sheetQueue = sheetFiles.slice();
@@ -2372,6 +2397,21 @@ Office.onReady(async ({ host }) => {
       if (!res.ok) return null;
       const data = await res.json();
       return data.svg || null;
+    } catch { return null; }
+  }
+
+  // Normalize + AI-name several icons at once. Returns [{name, tags, svg}] or null.
+  async function nameBatch(svgs) {
+    try {
+      const token = await getAccessToken();
+      const res = await fetch(`${ICON_API_BASE}/icons/name-batch`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ svgs })
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.results || null;
     } catch { return null; }
   }
 
