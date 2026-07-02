@@ -10,7 +10,7 @@
   <Version>1.0.0.0</Version>
   <ProviderName>Your Company</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Icon Library" />
+  <DisplayName DefaultValue="Spectrum Icon Library" />
   <Description DefaultValue="Browse and insert curated icons into your document." />
 
   <IconUrl DefaultValue="https://localhost:3000/icon-32.png" />
@@ -144,8 +144,8 @@
         <bt:Url id="LearnMoreUrl" DefaultValue="https://localhost:3000/" />
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="Icon Library is ready!" />
-        <bt:String id="CommandsGroup.Label" DefaultValue="Icon Library" />
+        <bt:String id="GetStarted.Title" DefaultValue="Spectrum Icon Library is ready!" />
+        <bt:String id="CommandsGroup.Label" DefaultValue="Spectrum Icon Library" />
         <bt:String id="OpenPaneButton.Label" DefaultValue="Insert Icon" />
       </bt:ShortStrings>
       <bt:LongStrings>
