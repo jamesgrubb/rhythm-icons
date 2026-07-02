@@ -447,9 +447,10 @@ Office.onReady(async ({ host }) => {
   // ---- Render ----
   function renderClientTabs(clients) {
     clientTabs.innerHTML = "";
+    const isAdmin = currentUserRole === 'admin';
 
-    // Only show client tabs if there are multiple clients or any assigned icons
-    if (clients.length <= 1) {
+    // Hide the strip only when there's nothing to show and no admin controls
+    if (clients.length <= 1 && !isAdmin) {
       clientTabs.style.display = "none";
       return;
     }
@@ -472,6 +473,22 @@ Office.onReady(async ({ host }) => {
       });
       clientTabs.appendChild(btn);
     });
+
+    if (isAdmin) {
+      const addBtn = document.createElement("button");
+      addBtn.className = "tab-btn group-add-btn";
+      addBtn.textContent = "+ New group";
+      addBtn.title = "Create a new group";
+      addBtn.addEventListener("click", createNewGroup);
+      clientTabs.appendChild(addBtn);
+
+      const manageBtn = document.createElement("button");
+      manageBtn.className = "tab-btn group-manage-btn";
+      manageBtn.title = "Manage groups";
+      manageBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`;
+      manageBtn.addEventListener("click", openManageGroups);
+      clientTabs.appendChild(manageBtn);
+    }
   }
 
   /**
@@ -640,7 +657,7 @@ Office.onReady(async ({ host }) => {
 
       // Re-render UI
       invalidateCountCache();
-      const clients = getClients(allIcons, allClients.map(c => c.name));
+      const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
       renderClientTabs(clients);
       renderGrid();
 
@@ -851,7 +868,7 @@ Office.onReady(async ({ host }) => {
 
         // Re-render UI
         invalidateCountCache();
-        const clients = getClients(allIcons, allClients.map(c => c.name));
+        const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
         renderClientTabs(clients);
         renderGrid();
 
@@ -954,7 +971,7 @@ Office.onReady(async ({ host }) => {
 
       exitSelectionMode();
       invalidateCountCache();
-      renderClientTabs(getClients(allIcons, allClients.map(c => c.name)));
+      renderClientTabs(getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name)));
       renderGrid();
       showToast(`${data.deleted} icon${data.deleted !== 1 ? "s" : ""} deleted`);
     } catch (error) {
@@ -1641,7 +1658,7 @@ Office.onReady(async ({ host }) => {
     aiSearchIds = null;
     aiChip.classList.add("hidden");
     if (rerender) {
-      renderClientTabs(getClients(allIcons, allClients.map(c => c.name)));
+      renderClientTabs(getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name)));
       renderGrid();
     }
   }
@@ -1663,7 +1680,7 @@ Office.onReady(async ({ host }) => {
       const { ids } = await res.json();
       aiSearchIds = ids || [];
       aiChipLabel.textContent = `✨ "${query}" — ${aiSearchIds.length} match${aiSearchIds.length !== 1 ? "es" : ""}`;
-      renderClientTabs(getClients(allIcons, allClients.map(c => c.name)));
+      renderClientTabs(getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name)));
       renderGrid();
     } catch (err) {
       console.error("[AI Search] Failed:", err);
@@ -1678,7 +1695,7 @@ Office.onReady(async ({ host }) => {
     clearAiSearch({ rerender: false }); // typing returns to instant local filtering
 
     // Refresh client tabs to update counts based on search
-    const clients = getClients(allIcons, allClients.map(c => c.name));
+    const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
     renderClientTabs(clients);
 
     renderGrid();
@@ -1700,7 +1717,7 @@ Office.onReady(async ({ host }) => {
     clearAiSearch({ rerender: false });
 
     // Refresh client tabs to show full counts
-    const clients = getClients(allIcons, allClients.map(c => c.name));
+    const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
     renderClientTabs(clients);
 
     renderGrid();
@@ -1905,7 +1922,7 @@ Office.onReady(async ({ host }) => {
     allIcons = await fetchIconsFromAPI(accessToken);
     await fetchClients();
     invalidateCountCache();
-    const clients = getClients(allIcons, allClients.map(c => c.name));
+    const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
 
     renderClientTabs(clients);
     renderGrid();
@@ -2019,8 +2036,9 @@ Office.onReady(async ({ host }) => {
   function renderGroupChips(container, selectedIds, { includeUnassigned = false } = {}) {
     if (!container) return;
     const selected = new Set((selectedIds || []).map(String));
+    const groups = allClients.filter(c => c.is_active !== false); // only active groups
     container.innerHTML = "";
-    if (!allClients.length && !includeUnassigned) {
+    if (!groups.length && !includeUnassigned) {
       container.innerHTML = '<span class="group-chips-empty">No groups yet.</span>';
       return;
     }
@@ -2050,7 +2068,7 @@ Office.onReady(async ({ host }) => {
       container.appendChild(unassignedChip);
     }
 
-    allClients.forEach(client => {
+    groups.forEach(client => {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "group-chip" + (selected.has(String(client.id)) ? " selected" : "");
@@ -2075,6 +2093,131 @@ Office.onReady(async ({ host }) => {
     return [...container.querySelectorAll(".group-chip.selected")]
       .map(c => c.dataset.clientId)
       .filter(Boolean);
+  }
+
+  // ---- Group management (admin): create / rename / disable / delete ----
+  const manageModal     = document.getElementById("manage-groups-modal");
+  const manageList      = document.getElementById("manage-groups-list");
+  const manageNewInput  = document.getElementById("manage-new-group");
+  const manageAddBtn    = document.getElementById("manage-add-btn");
+  const manageCloseBtn  = document.getElementById("manage-close-btn");
+
+  const activeGroupNames = () => allClients.filter(c => c.is_active !== false).map(c => c.name);
+
+  async function refreshGroupsUI() {
+    await fetchClients();
+    renderClientTabs(getClients(allIcons, activeGroupNames()));
+  }
+
+  async function createGroup(name) {
+    const token = await getAccessToken();
+    const res = await fetch(`${ICON_API_BASE}/clients`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || "Failed to create group"); }
+    return res.json();
+  }
+
+  async function updateGroup(id, body) {
+    const token = await getAccessToken();
+    const res = await fetch(`${ICON_API_BASE}/clients/${id}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || "Failed to update group"); }
+    return res.json();
+  }
+
+  // "+ New group" quick-add from the tab strip
+  async function createNewGroup() {
+    const name = await customPrompt("Group name", "New group");
+    if (!name || !name.trim()) return;
+    try {
+      await createGroup(name.trim());
+      await refreshGroupsUI();
+      showToast(`Group "${name.trim()}" created`);
+    } catch (e) { showToast(`Error: ${e.message}`); }
+  }
+
+  function renderManageGroups() {
+    if (!manageList) return;
+    manageList.innerHTML = "";
+    if (!allClients.length) {
+      manageList.innerHTML = '<p class="group-chips-empty">No groups yet — add one above.</p>';
+      return;
+    }
+    allClients.forEach(client => {
+      const active = client.is_active !== false;
+      const row = document.createElement("div");
+      row.className = "group-row" + (active ? "" : " group-row-disabled");
+      row.innerHTML = `
+        <input class="group-row-name confirm-input" value="${(client.name || "").replace(/"/g, "&quot;")}" />
+        <span class="group-row-count">${client.icon_count || 0}</span>
+        <button class="group-row-toggle" type="button">${active ? "Disable" : "Enable"}</button>
+        <button class="group-row-delete" type="button" title="Delete group">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>`;
+
+      const nameInput = row.querySelector(".group-row-name");
+      const commitName = async () => {
+        const newName = nameInput.value.trim();
+        if (!newName || newName === client.name) { nameInput.value = client.name; return; }
+        try { await updateGroup(client.id, { name: newName }); client.name = newName; await refreshGroupsUI(); showToast("Group renamed"); }
+        catch (e) { nameInput.value = client.name; showToast(`Error: ${e.message}`); }
+      };
+      nameInput.addEventListener("blur", commitName);
+      nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") nameInput.blur(); });
+
+      row.querySelector(".group-row-toggle").addEventListener("click", async () => {
+        try { await updateGroup(client.id, { is_active: !active }); await refreshGroupsUI(); renderManageGroups(); }
+        catch (e) { showToast(`Error: ${e.message}`); }
+      });
+
+      row.querySelector(".group-row-delete").addEventListener("click", async () => {
+        const confirmed = await customConfirm(
+          `Delete "${client.name}"? ${client.icon_count || 0} icon${(client.icon_count || 0) !== 1 ? "s" : ""} will be unassigned. This can't be undone.`,
+          "Delete group"
+        );
+        if (!confirmed) return;
+        try {
+          const token = await getAccessToken();
+          const res = await fetch(`${ICON_API_BASE}/clients/${client.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+          if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || "Failed to delete"); }
+          await refreshGroupsUI();
+          await loadIcons(token); // some icons became unassigned
+          renderManageGroups();
+          showToast(`Group "${client.name}" deleted`);
+        } catch (e) { showToast(`Error: ${e.message}`); }
+      });
+
+      manageList.appendChild(row);
+    });
+  }
+
+  async function openManageGroups() {
+    await fetchClients();
+    renderManageGroups();
+    manageModal.classList.remove("hidden");
+  }
+
+  if (manageModal) {
+    manageCloseBtn.addEventListener("click", () => manageModal.classList.add("hidden"));
+    manageModal.addEventListener("click", (e) => { if (e.target === manageModal) manageModal.classList.add("hidden"); });
+    manageAddBtn.addEventListener("click", async () => {
+      const name = manageNewInput.value.trim();
+      if (!name) return;
+      try {
+        await createGroup(name);
+        manageNewInput.value = "";
+        await refreshGroupsUI();
+        renderManageGroups();
+        showToast(`Group "${name}" created`);
+      } catch (e) { showToast(`Error: ${e.message}`); }
+    });
+    manageNewInput.addEventListener("keydown", (e) => { if (e.key === "Enter") manageAddBtn.click(); });
   }
 
   function populateClientSelect() {

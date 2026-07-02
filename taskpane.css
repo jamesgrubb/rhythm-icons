@@ -335,6 +335,76 @@ header {
 .tab-btn:hover { color: var(--text); }
 .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
+/* Group add / manage controls in the tab strip */
+.group-add-btn { color: var(--accent); font-weight: 600; border-bottom-color: transparent !important; }
+.group-manage-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px 8px;
+  color: var(--text-2);
+  border-bottom-color: transparent !important;
+}
+.group-manage-btn:hover { color: var(--text); }
+
+/* Manage Groups modal */
+.manage-add-row { display: flex; gap: 8px; margin: 14px 0 12px; }
+.manage-add-row .confirm-input { flex: 1; min-width: 0; }
+.manage-add-row .btn-primary { width: auto; padding: 0 16px; }
+.manage-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.group-row-disabled { opacity: 0.5; }
+.group-row-name { flex: 1; min-width: 0; }
+.group-row-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: var(--mono);
+  min-width: 30px;
+  text-align: right;
+}
+.group-row-count::after { content: " icons"; }
+.group-row-toggle {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border-2);
+  color: var(--text-2);
+  font: 500 11px var(--font);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.group-row-toggle:hover { color: var(--text); border-color: var(--text-3); }
+.group-row-delete {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px; height: 30px;
+  background: none;
+  border: none;
+  color: var(--text-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.group-row-delete svg { width: 14px; height: 14px; }
+.group-row-delete:hover { color: var(--danger); background: rgba(255, 90, 90, 0.1); }
+
 /* ---- TAG FILTER SECTION ---- */
 .tag-filter-section {
   display: flex;

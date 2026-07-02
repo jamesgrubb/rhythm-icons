@@ -599,10 +599,11 @@ app.get("/api/clients", requireAuth, ensureTenantExists, extractUserRole, async 
     }
 
     const result = await pool.query(
-      `SELECT id, name, created_at
-       FROM clients
-       WHERE tenant_id = $1
-       ORDER BY name`,
+      `SELECT c.id, c.name, c.created_at, c.is_active,
+              (SELECT count(*)::int FROM icon_clients ic WHERE ic.client_id = c.id) AS icon_count
+       FROM clients c
+       WHERE c.tenant_id = $1
+       ORDER BY c.name`,
       [tenantId]
     );
 
@@ -645,6 +646,42 @@ app.post("/api/clients", requireAuth, ensureTenantExists, extractUserRole, requi
     }
 
     res.status(500).json({ error: "Failed to create client" });
+  }
+});
+
+// PUT /api/clients/:id — rename and/or enable/disable a client (admin only)
+app.put("/api/clients/:id", requireAuth, ensureTenantExists, extractUserRole, requireRole('admin'), async (req, res) => {
+  const { id } = req.params;
+  const tenantId = req.user.tenantId;
+  const { name, is_active } = req.body;
+
+  if (name !== undefined && !String(name).trim()) {
+    return res.status(400).json({ error: "Group name cannot be empty" });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE clients
+       SET name = COALESCE($1, name),
+           is_active = COALESCE($2, is_active),
+           updated_at = NOW()
+       WHERE id = $3 AND tenant_id = $4
+       RETURNING id, name, is_active`,
+      [name !== undefined ? String(name).trim() : null,
+       typeof is_active === 'boolean' ? is_active : null,
+       id, tenantId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Group not found or access denied' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: "A group with that name already exists" });
+    }
+    console.error('[API] Error updating client:', error);
+    res.status(500).json({ error: 'Failed to update group' });
   }
 });
 

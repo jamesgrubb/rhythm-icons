@@ -713,7 +713,10 @@ function getClients(icons, allGroupNames = []) {
   icons.forEach(i => {
     const cs = iconClientNames(i);
     if (cs.length === 0) hasUnassigned = true;
-    cs.forEach(n => names.add(n));
+    // When the caller supplies the full (active) group list, use only that so
+    // disabled groups don't reappear as tabs from icon assignments. Otherwise
+    // fall back to deriving names from the icons.
+    if (allGroupNames.length === 0) cs.forEach(n => names.add(n));
   });
   const result = ["All", ...[...names].sort()];
   if (hasUnassigned) result.push("Unassigned");
