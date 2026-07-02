@@ -445,9 +445,24 @@ Office.onReady(async ({ host }) => {
   }
 
   // ---- Render ----
+  // Group names to show as tabs. Active groups are visible to everyone; admins
+  // additionally see disabled groups (rendered greyed-out) so they stay visible
+  // and manageable rather than silently vanishing. Viewers never see disabled.
+  function groupTabNames() {
+    const isAdmin = currentUserRole === 'admin';
+    return allClients
+      .filter(c => isAdmin || c.is_active !== false)
+      .map(c => c.name);
+  }
+
   function renderClientTabs(clients) {
     clientTabs.innerHTML = "";
     const isAdmin = currentUserRole === 'admin';
+    // Names of disabled groups (only ever populated for admins — viewers don't
+    // get disabled names in `clients`, so their tabs never match this set).
+    const disabledNames = new Set(
+      allClients.filter(c => c.is_active === false).map(c => c.name)
+    );
 
     // Hide the strip only when there's nothing to show and no admin controls
     if (clients.length <= 1 && !isAdmin) {
@@ -459,10 +474,16 @@ Office.onReady(async ({ host }) => {
     clients.forEach(client => {
       // Calculate count for this client
       const count = getCachedClientCount(client, activeQuery);
+      const isDisabled = disabledNames.has(client);
 
       const btn = document.createElement("button");
-      btn.className = "tab-btn client-tab-btn" + (client === activeClient ? " active" : "");
+      btn.className = "tab-btn client-tab-btn"
+        + (client === activeClient ? " active" : "")
+        + (isDisabled ? " client-tab-disabled" : "");
       btn.textContent = `${client} (${count})`;
+      if (isDisabled) {
+        btn.title = "Disabled group — hidden from viewers. Enable it in Manage Groups.";
+      }
       btn.addEventListener("click", () => {
         activeClient = client;
         // Switching groups clears any in-progress selection to avoid cross-group deletes
@@ -657,7 +678,7 @@ Office.onReady(async ({ host }) => {
 
       // Re-render UI
       invalidateCountCache();
-      const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
+      const clients = getClients(allIcons, groupTabNames());
       renderClientTabs(clients);
       renderGrid();
 
@@ -868,7 +889,7 @@ Office.onReady(async ({ host }) => {
 
         // Re-render UI
         invalidateCountCache();
-        const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
+        const clients = getClients(allIcons, groupTabNames());
         renderClientTabs(clients);
         renderGrid();
 
@@ -971,7 +992,7 @@ Office.onReady(async ({ host }) => {
 
       exitSelectionMode();
       invalidateCountCache();
-      renderClientTabs(getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name)));
+      renderClientTabs(getClients(allIcons, groupTabNames()));
       renderGrid();
       showToast(`${data.deleted} icon${data.deleted !== 1 ? "s" : ""} deleted`);
     } catch (error) {
@@ -1658,7 +1679,7 @@ Office.onReady(async ({ host }) => {
     aiSearchIds = null;
     aiChip.classList.add("hidden");
     if (rerender) {
-      renderClientTabs(getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name)));
+      renderClientTabs(getClients(allIcons, groupTabNames()));
       renderGrid();
     }
   }
@@ -1680,7 +1701,7 @@ Office.onReady(async ({ host }) => {
       const { ids } = await res.json();
       aiSearchIds = ids || [];
       aiChipLabel.textContent = `✨ "${query}" — ${aiSearchIds.length} match${aiSearchIds.length !== 1 ? "es" : ""}`;
-      renderClientTabs(getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name)));
+      renderClientTabs(getClients(allIcons, groupTabNames()));
       renderGrid();
     } catch (err) {
       console.error("[AI Search] Failed:", err);
@@ -1695,7 +1716,7 @@ Office.onReady(async ({ host }) => {
     clearAiSearch({ rerender: false }); // typing returns to instant local filtering
 
     // Refresh client tabs to update counts based on search
-    const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
+    const clients = getClients(allIcons, groupTabNames());
     renderClientTabs(clients);
 
     renderGrid();
@@ -1717,7 +1738,7 @@ Office.onReady(async ({ host }) => {
     clearAiSearch({ rerender: false });
 
     // Refresh client tabs to show full counts
-    const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
+    const clients = getClients(allIcons, groupTabNames());
     renderClientTabs(clients);
 
     renderGrid();
@@ -1922,7 +1943,7 @@ Office.onReady(async ({ host }) => {
     allIcons = await fetchIconsFromAPI(accessToken);
     await fetchClients();
     invalidateCountCache();
-    const clients = getClients(allIcons, allClients.filter(c => c.is_active !== false).map(c => c.name));
+    const clients = getClients(allIcons, groupTabNames());
 
     renderClientTabs(clients);
     renderGrid();
@@ -2102,11 +2123,9 @@ Office.onReady(async ({ host }) => {
   const manageAddBtn    = document.getElementById("manage-add-btn");
   const manageCloseBtn  = document.getElementById("manage-close-btn");
 
-  const activeGroupNames = () => allClients.filter(c => c.is_active !== false).map(c => c.name);
-
   async function refreshGroupsUI() {
     await fetchClients();
-    renderClientTabs(getClients(allIcons, activeGroupNames()));
+    renderClientTabs(getClients(allIcons, groupTabNames()));
   }
 
   async function createGroup(name) {
@@ -2116,8 +2135,42 @@ Office.onReady(async ({ host }) => {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ name })
     });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || "Failed to create group"); }
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      const err = new Error(e.error || "Failed to create group");
+      err.status = res.status; // let callers detect a 409 name collision
+      throw err;
+    }
     return res.json();
+  }
+
+  // Create a group, or — when the name collides with an existing *disabled*
+  // group — offer to re-enable that one instead of dead-ending on the generic
+  // "already exists" error. Returns { status: "created"|"reenabled", name },
+  // or null if the user cancelled the re-enable prompt.
+  async function createOrReenableGroup(name) {
+    try {
+      const row = await createGroup(name);
+      return { status: "created", name: row.name || name };
+    } catch (e) {
+      if (e.status !== 409) throw e;
+      // Name is taken. Refresh so we see the current state, then check whether
+      // the clash is with a disabled group we can simply switch back on.
+      await fetchClients();
+      const match = allClients.find(c => c.name === name);
+      if (match && match.is_active === false) {
+        const ok = await customConfirm(
+          `A group named "${match.name}" already exists but is disabled. Re-enable it?`,
+          "Group is disabled",
+          { confirmLabel: "Re-enable", danger: false }
+        );
+        if (!ok) return null;
+        await updateGroup(match.id, { is_active: true });
+        return { status: "reenabled", name: match.name };
+      }
+      // An active group with that name already exists (and is visible).
+      throw new Error(`A group named "${match ? match.name : name}" already exists.`);
+    }
   }
 
   async function updateGroup(id, body) {
@@ -2136,9 +2189,10 @@ Office.onReady(async ({ host }) => {
     const name = await customPrompt("Group name", "New group");
     if (!name || !name.trim()) return;
     try {
-      await createGroup(name.trim());
+      const outcome = await createOrReenableGroup(name.trim());
+      if (!outcome) return; // re-enable prompt cancelled
       await refreshGroupsUI();
-      showToast(`Group "${name.trim()}" created`);
+      showToast(`Group "${outcome.name}" ${outcome.status === "reenabled" ? "re-enabled" : "created"}`);
     } catch (e) { showToast(`Error: ${e.message}`); }
   }
 
@@ -2210,11 +2264,12 @@ Office.onReady(async ({ host }) => {
       const name = manageNewInput.value.trim();
       if (!name) return;
       try {
-        await createGroup(name);
+        const outcome = await createOrReenableGroup(name);
+        if (!outcome) return; // re-enable prompt cancelled
         manageNewInput.value = "";
         await refreshGroupsUI();
         renderManageGroups();
-        showToast(`Group "${name}" created`);
+        showToast(`Group "${outcome.name}" ${outcome.status === "reenabled" ? "re-enabled" : "created"}`);
       } catch (e) { showToast(`Error: ${e.message}`); }
     });
     manageNewInput.addEventListener("keydown", (e) => { if (e.key === "Enter") manageAddBtn.click(); });
