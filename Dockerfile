@@ -20,8 +20,15 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
-# Copy source and build frontend bundle
+# Copy source and build frontend bundle.
+# The frontend Azure config is baked in at build time (the browser can't read
+# runtime env). Railway/Azure supply these from the service's env vars; if
+# unset, webpack falls back to the original dev-tenant defaults.
 COPY . .
+ARG AZURE_CLIENT_ID
+ARG AZURE_TENANT_ID
+ENV AZURE_CLIENT_ID=$AZURE_CLIENT_ID
+ENV AZURE_TENANT_ID=$AZURE_TENANT_ID
 RUN npm run build
 
 ENV NODE_ENV=production

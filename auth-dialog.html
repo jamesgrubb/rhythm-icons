@@ -58,10 +58,10 @@
 
   <script>
     const AUTH_CONFIG = {
-      clientId: "19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c",
-      tenantId: "dbd0413f-9515-4bd1-945a-1948b655558b",
+      clientId: "<%= azureClientId %>",
+      tenantId: "<%= azureTenantId %>",
       redirectUri: window.location.origin + "/auth-dialog.html",
-      apiScope: "api://19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c/Icons.Read",
+      apiScope: "api://<%= azureClientId %>/Icons.Read",
     };
 
     const msalConfig = {

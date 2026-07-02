@@ -4,14 +4,15 @@
 // =============================================
 
 window.AUTH_CONFIG = {
-  // Azure App Registration values
-  clientId:    "19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c",
-  tenantId:    "dbd0413f-9515-4bd1-945a-1948b655558b",
+  // Azure App Registration values — injected at build time by webpack
+  // (DefinePlugin) from AZURE_CLIENT_ID / AZURE_TENANT_ID. See DEPLOYMENT-AZURE.md.
+  clientId:    process.env.AZURE_CLIENT_ID,
+  tenantId:    process.env.AZURE_TENANT_ID,
   redirectUri: window.location.origin + "/taskpane.html", // Auto-detects localhost or production domain
 
   // Scopes your API requires
   scopes: ["openid", "profile", "email"],
-  apiScope: "api://19c2f55b-db3c-44c0-9ca6-1fd91f8a2c5c/Icons.Read",
+  apiScope: `api://${process.env.AZURE_CLIENT_ID}/Icons.Read`,
 };
 const AUTH_CONFIG = window.AUTH_CONFIG;
 
